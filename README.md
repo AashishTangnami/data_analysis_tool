@@ -1,6 +1,9 @@
 # Dynamic Data Analysis Platform
 
-A state-of-the-art, comprehensive platform for advanced automated data analysis that supports the complete analytics lifecycle: descriptive, diagnostic, predictive, and prescriptive analytics. This powerful tool allows users to upload data in a variety of formats and seamlessly progress through each stage of data analysis with sophisticated algorithms and visualizations.
+*** This project is under heavy development and is not yet ready for use. ***
+
+## 📊 Overview
+A state-of-the-art, comprehensive platform for advanced automated data analysis that supports the complete analytics lifecycle: descriptive, diagnostic, [Future : predictive, and prescriptive analytics]. This powerful tool allows users to upload data in a variety of formats and seamlessly progress through each stage of data analysis with sophisticated algorithms and visualizations.
 
 ## 🌟 Features
 
@@ -13,8 +16,11 @@ A state-of-the-art, comprehensive platform for advanced automated data analysis 
   - Avro
   - XML
   - ORC
+
 - **Data Validation**: Automatic validation and error detection in uploaded data
 - **Integration**: Connect directly with databases and APIs
+
+- **Mutiple Engine Support**: Pandas, Polars, PySpark
 
 ### Data Processing
 - **Automated Data Cleaning**: Smart detection and handling of missing values, outliers, and duplicates
@@ -49,13 +55,15 @@ A state-of-the-art, comprehensive platform for advanced automated data analysis 
 ### Visualization & Reporting
 - **Interactive Dashboards**: Drag-and-drop interface to create custom dashboards
 - **Advanced Visualizations**: From simple charts to complex network graphs
-- **Report Generation**: Export findings as PDF, PowerPoint, or interactive HTML
+- **Report Generation**: Export findings as PDF, PowerPoint, or interactive HTML [Advance Feature]
 
 ### Multiple Interfaces
-- **Web UI**: User-friendly interface for non-technical users
+- **Web UI**: User-friendly interface for non-technical users, [POC : Streamlit , Advance Feature : Next.js] 
 - **REST API**: Programmatic access for integration with other systems
 - **CLI**: Command-line tools for automation and scripting
 
+
+## Core Objective of the Project.
 ## 🔍 Step-by-Step Analysis Capabilities
 
 The platform guides users through a structured data analysis workflow:
@@ -65,29 +73,39 @@ The platform guides users through a structured data analysis workflow:
 - Correlation analysis and relationship mapping
 - Trend identification and pattern recognition
 - Distribution analysis and visualization
+- Time-series decomposition (trend, seasonality, residual) [Advance Feature]
+- Geospatial analysis for location-based insights [Advance Feature]
 
 ### 2. Diagnostic Analysis
 - Drill-down capabilities for deeper investigation
 - Anomaly detection and outlier analysis
 - Comparative analysis across dimensions
 - Factor analysis to determine influence weights
+- Causal inference techniques (e.g., Granger causality, A/B testing) [Advance Feature]
+- Hypothesis testing for statistical validation [Advance Feature]
 
-### 3. Predictive Analysis
+### 3. Predictive Analysis [Advance Feature]
 - Automated model selection and hyperparameter tuning
 - Feature importance ranking
 - Cross-validation and model evaluation
 - Confidence intervals and prediction probabilities
+- Ensemble methods (e.g., Random Forest, Gradient Boosting) 
+- Deep learning models for unstructured data 
+- NLP techniques for text-based predictions
 
-### 4. Prescriptive Analysis
+### 4. Prescriptive Analysis [Advance Feature]
 - "What-if" scenario modeling
 - Optimization for business objectives
 - Action recommendation prioritization
-- Risk assessment and mitigation strategies
+- Risk assessment and mitigation strategies  
+- Real-time optimization for dynamic decision-making  
+- Game theory models for competitive strategy analysis  
+- Cost-benefit analysis for prioritizing recommendations 
 
 ## 🚀 Installation and Setup
 
 ### Prerequisites
-- Python 3.8 or higher
+- Python 3.13 
 - Git
 
 ### Using pip with uv (recommended)
@@ -117,20 +135,13 @@ DATABASE_URL=your_database_url
 
 ### Command Line Interface (CLI)
 ```bash
-# Basic data analysis
-ddap analyze --file data.csv --type descriptive
-
-# Predictive analysis with specific model
-ddap predict --file data.csv --target sales --model random_forest
-
-# Generate a comprehensive report
-ddap report --file data.csv --output report.pdf
+-------
 ```
 
 ### Web Interface
 1. Start the web server:
    ```bash
-   ddap serve
+   ------
    ```
 2. Open your browser at http://localhost:8000
 3. Upload your data file
