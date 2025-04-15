@@ -1,38 +1,34 @@
-"""
-FastAPI main application module.
-"""
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import os
-from typing import List
+from src.api.routers import upload, ingestion, preprocessing, transformation
+from src.api.middleware import TimingMiddleware
 
-from ..config import API_HOST, API_PORT, API_WORKERS
-from ..core.data_ingestion import validate_file_format, save_uploaded_file, load_data
+app = FastAPI(title="Data Analysis Tool API", 
+              version="1.0", 
+              description="API for processing and analyzing data files using different engine strategies.")
 
-app = FastAPI(
-    title="Dynamic Data Analysis Platform API",
-    description="API for uploading and analyzing data with descriptive, diagnostic, predictive, and prescriptive analytics.",
-    version="0.1.0"
-)
+# Adding middleware for request timing
+app.add_middleware(TimingMiddleware)
 
-# Add CORS middleware
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update this in production
+    allow_origins=["http://localhost:8501"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(ingestion.router, prefix="/api/v1/ingestion", tags=["ingestion"])
+app.include_router(preprocessing.router, prefix="/api/v1/preprocessing", tags=["preprocessing"])
+app.include_router(transformation.router, prefix="/api/v1/transformation", tags=["transformation"])
+
 def start_api():
-    """Start the FastAPI application with uvicorn."""
-    uvicorn.run(
-        app,
-        host=API_HOST,
-        port=API_PORT,
-        workers=1  # Changed from API_WORKERS to 1
-    )
+    """Start the FastAPI server"""
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
 
 if __name__ == "__main__":
     start_api()
+
