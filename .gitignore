@@ -64,3 +64,9 @@ data/processed/*
 # OS
 .DS_Store
 Thumbs.db
+
+
+# ignore all the __pycache__ in the codebase
+**/__pycache__
+**/**/__pycache__ 
+**/**/**/__pycache__

@@ -42,6 +42,7 @@ dependencies = [
      "pandas>=2.2.3",
      "polars>=1.27.1",
      "requests>=2.32.3",
+     "aiofiles>=24.1.0",
 ]
 
 [project.optional-dependencies]

@@ -1,89 +1,158 @@
 import streamlit as st
-from src.frontend.pages.upload_page import upload_page
-from src.frontend.pages.preprocess_page import preprocess_page
-from src.frontend.pages.analysis_page import render_analysis_page
-from src.frontend.pages.results_page import view_results_page
-from src.frontend.components.sidebar import render_sidebar
+import requests
+import json
+from components.engine_selector import render_engine_selector
+from components.file_uploader import render_file_uploader
+from components.data_preview import render_data_preview
+from pages.preprocessing import render_preprocessing_page
+from pages.analysis import render_analysis_page
 
-# Set page configuration
-st.set_page_config(
-    page_title="Dynamic Data Analysis Platform",
-    page_icon="📊",
-    layout="wide"
-)
-
-def initialize_session_state():
-    """Initialize session state variables."""
-    if "data" not in st.session_state:
-        st.session_state.data = None
-    if "current_step" not in st.session_state:
-        st.session_state.current_step = "upload"
-    if "engine" not in st.session_state:
-        st.session_state.engine = "pandas"
-    if "uploaded_file_info" not in st.session_state:
-        st.session_state.uploaded_file_info = None
-    if "preprocessed_data" not in st.session_state:
-        st.session_state.preprocessed_data = None
-    if "analysis_results" not in st.session_state:
-        st.session_state.analysis_results = None
+# API endpoint base URL
+API_BASE_URL = "http://localhost:8000/api"
 
 def main():
-    """Main Streamlit application.
-  
-  
-        Upload Data & Ingestion
-        1. Data Collection and Integration: 
-            Gather data from various sources such as web scraping, APIs, or file imports, and merge/integrate data if needed.
-        2. Data Cleaning: 
-            Remove duplicates, correct errors (e.g., typos), and handle missing values through imputation or removal.
-        3. Data Transformation: 
-            Convert data types, aggregate data, encode categorical variables, scale numerical values, and create new features.
-        4. Data Storage: 
-            Store data in a suitable repository (relational database, NoSQL, or file system) while capturing metadata (source, schema, timestamp) and ensuring security/privacy.
-        5. Data Access: 
-            Provide users or systems with access to the stored data via APIs, database connections, or direct file retrieval.
-
-        Data Cleaning, Preparation, and Validation
-        1. Handling Missing Values: Detect and appropriately impute or remove missing data based on contextual requirements.
-        2. Outlier Detection and Treatment: Identify and address outliers based on statistical methods or domain knowledge.
-        3. Data Validation: Ensure data meets expected formats, quality standards, and integrity constraints.
-        4. Feature Engineering: Generate new features from existing data to better support analysis.
-        5. Data Normalization: Standardize data scales to improve consistency for analysis.
-        6. Data Splitting: Partition data into training, validation, and testing sets for modeling or further analysis.
-        7. Data Aggregation: Summarize data at a higher granularity when necessary.
-        8. Data Quality Assessment: Continuously review and improve data quality through systematic checks.
-
-        EDA
-        1. Univariate Analysis: Examine individual variables using summary statistics, histograms, and box plots.
-        2. Bivariate Analysis: Explore relationships between pairs of variables with scatter plots, correlation coefficients, or heatmaps.
-        3. Multivariate Analysis: Analyze interactions among multiple variables using techniques like pair plots or principal component analysis.
-        4. Data Visualization: Create diverse visualizations (e.g., bar charts, line graphs, heatmaps) to illustrate insights.
-        5. Hypothesis Testing: Use statistical tests to evaluate assumptions and determine the significance of observed relationships.
-        6. Data Storytelling: Develop narratives that effectively communicate insights and contextualize the findings.
-
-        Drawing Conclusions and Making Recommendations
-        1. Summarize Findings: Consolidate key insights from the analysis into a clear, comprehensive report.
-        2. Make Recommendations: Propose actionable steps based on the analytical insights.
-        3. Communicate Results: Present findings through compelling visualizations and narratives tailored to stakeholders.
-        4. Monitor Results: Track the implementation and impact of the recommendations over time.
-        5. Integration into Systems: Embed the insights and recommendations into business processes or operational systems.
-        6. Data Versioning and Lineage: Maintain version control and track data provenance to support reproducibility and iterative improvements.
-    """
-    initialize_session_state()
-    st.title("Dynamic Data Analysis Platform")
+    """Main Streamlit application."""
+    st.set_page_config(
+        page_title="Dynamic Data Analysis Tool",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     
-    # # Render sidebar
-    # render_sidebar()
+    # Add a sidebar for navigation
+    st.sidebar.title("Navigation")
     
-    # Main content based on current step
-    if st.session_state.current_step == "upload":
-        upload_page()
-    elif st.session_state.current_step == "preprocess":
-        preprocess_page()
-    elif st.session_state.current_step == "analyze":
-        render_analysis_page()
-    elif st.session_state.current_step == "visualize":
-        view_results_page()
+    # Initialize session state for page if not present
+    if "page" not in st.session_state:
+        st.session_state.page = "Upload"
+    
+    # Page selection with radio buttons
+    page = st.sidebar.radio(
+        "Select a page",
+        ["Upload", "Preprocessing", "Analysis"],
+        index=0 if st.session_state.page == "Upload" else 
+              1 if st.session_state.page == "Preprocessing" else 2
+    )
+    
+    # Update current page in session state
+    # frontend/app.py (continued)
+    # Update current page in session state
+    st.session_state.page = page
+    
+    # Initialize session state
+    if "file_id" not in st.session_state:
+        st.session_state.file_id = None
+    if "engine_type" not in st.session_state:
+        st.session_state.engine_type = "pandas"
+    if "data_preview" not in st.session_state:
+        st.session_state.data_preview = None
+    if "data_summary" not in st.session_state:
+        st.session_state.data_summary = None
+    if "preprocessed_data" not in st.session_state:
+        st.session_state.preprocessed_data = None
+    
+    # Add engine selector in the sidebar (always visible)
+    st.sidebar.subheader("Engine Selection")
+    current_engine = render_engine_selector()
+    
+    # Display status information in the sidebar
+    st.sidebar.subheader("Status")
+    if st.session_state.file_id:
+        st.sidebar.success(f"File loaded: {st.session_state.file_id.split('_', 1)[1]}")
+        st.sidebar.info(f"Engine: {st.session_state.engine_type}")
+        
+        if "preprocessing_applied" in st.session_state and st.session_state.preprocessing_applied:
+            st.sidebar.success("✅ Preprocessing applied")
+        
+        if "analysis_completed" in st.session_state and st.session_state.analysis_completed:
+            st.sidebar.success(f"✅ {st.session_state.analysis_type.capitalize()} analysis completed")
+    else:
+        st.sidebar.warning("No file loaded")
+    
+    # Render the selected page
+    if page == "Upload":
+        render_upload_page()
+    elif page == "Preprocessing":
+        if "file_id" not in st.session_state or st.session_state.file_id is None:
+            st.warning("Please upload a file first.")
+            render_upload_page()
+        # if st.session_state.file_id is None:
+        #     st.warning("Please upload a file first.")
+        #     render_upload_page()
+        else:
+            render_preprocessing_page()
+    elif page == "Analysis":
+        if st.session_state.file_id is None:
+            st.warning("Please upload a file first.")
+            render_upload_page()
+        else:
+            render_analysis_page()
+
+def render_upload_page():
+    """Render the file upload page."""
+    st.title("Data Upload")
+    
+    # File upload component
+    uploaded_file = render_file_uploader()
+    
+    # Process the uploaded file when the upload button is clicked
+    if uploaded_file is not None:
+        with st.spinner("Processing file..."):
+            # Create a multipart form request
+            files = {"file": uploaded_file}
+            data = {"engine_type": st.session_state.engine_type}
+            
+            try:
+                response = requests.post(
+                    f"{API_BASE_URL}/ingestion/upload",
+                    files=files,
+                    data=data
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    # Save results to session state
+                    st.session_state.file_id = result["file_id"]
+                    st.session_state.data_preview = result["preview"]
+                    st.session_state.data_summary = result["summary"]
+                    
+                    st.success("File uploaded successfully!")
+                    
+                    # Reset any previous analysis or preprocessing
+                    if "preprocessing_applied" in st.session_state:
+                        del st.session_state.preprocessing_applied
+                    if "analysis_completed" in st.session_state:
+                        del st.session_state.analysis_completed
+                    if "preprocessing_operations" in st.session_state:
+                        del st.session_state.preprocessing_operations
+                    
+                    # Display data preview
+                    render_data_preview(
+                        result["preview"],
+                        result["summary"]
+                    )
+                    
+                    # Add buttons to navigate to preprocessing or analysis
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("Proceed to Preprocessing"):
+                            st.session_state.page = "Preprocessing"
+                            st.rerun()
+                    
+                    with col2:
+                        if st.button("Proceed to Analysis"):
+                            st.session_state.page = "Analysis"
+                            st.rerun()
+                else:
+                    st.error(f"Error: {response.json()['detail']}")
+            
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     main()
+
+
+
+
