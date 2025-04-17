@@ -9,13 +9,31 @@ A state-of-the-art, comprehensive platform for advanced automated data analysis 
 
 ### Data Ingestion
 - **Multiple File Format Support**: Upload and analyze data from various formats:
-  - Excel (xlsx, xls)
-  - CSV
-  - JSON
+  - [x] ✅ Excel (xlsx, xls)
+  - [x] ✅ CSV
+  - [x] ✅ JSON
   - Parquet
   - Avro
   - XML
   - ORC
+
+**Engines**
+-   [x] ✅ Pandas
+-   [x] ✅ Polars
+-   [ ] PySpark
+
+**Preprocessing and Analysis**
+- [x] ✅ **Descriptive Analytics**  
+  Gain insights into past data with detailed summaries and visualizations.
+  
+- [ ] 🔄 **Diagnostic Analytics**  
+  Identify the root causes of trends and anomalies in your data.
+
+- [ ] 🔄 **Predictive Analytics** *(Coming Soon)*  
+  Use machine learning models to forecast future outcomes.
+
+- [ ] 🔄 **Prescriptive Analytics** *(Coming Soon)*  
+  Get recommendations for decision-making based on predictive analytics.
 
 - **Data Validation**: Automatic validation and error detection in uploaded data
 - **Integration**: Connect directly with databases and APIs
@@ -69,10 +87,10 @@ A state-of-the-art, comprehensive platform for advanced automated data analysis 
 The platform guides users through a structured data analysis workflow:
 
 ### 1. Descriptive Analysis
-- Data profiling and summary statistics
-- Correlation analysis and relationship mapping
+- Data profiling and summary statistics [x]
+- Correlation analysis [x] and relationship mapping
 - Trend identification and pattern recognition
-- Distribution analysis and visualization
+- Distribution analysis and visualization [x]
 - Time-series decomposition (trend, seasonality, residual) [Advance Feature]
 - Geospatial analysis for location-based insights [Advance Feature]
 
