@@ -1,4 +1,3 @@
-# frontend/components/data_preview.py
 import streamlit as st
 import pandas as pd
 import json
