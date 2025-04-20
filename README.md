@@ -1,4 +1,4 @@
-# Dynamic Data Analysis Platform
+ # Dynamic Data Analysis Platform
 
 ***This project is under heavy development and is not yet ready for use.***
 
@@ -183,17 +183,153 @@ print(analysis.json())
 
 ### Project Structure
 ```
-data_analysis_tool/
-├── src/                 # Source code
-│   ├── api/             # FastAPI implementation
-│   ├── cli/             # CLI implementation
-│   ├── core/            # Core analysis algorithms
-│   ├── frontend/        # Streamlit frontend
-│   └── utils/           # Utility functions
-├── tests/               # Test suite
-├── data/                # Sample datasets
-├── docs/                # Documentation
-└── pyproject.toml       # Project configuration
+dynamic_data_analysis_platform/
+├── README.md
+├── requirements.txt
+├── .env.example
+├── .gitignore
+├── pyproject.toml
+├── setup.py
+│
+├── data/
+│   ├── raw/
+│   ├── processed/
+│   └── cache/
+│
+├── src/
+│   ├── __init__.py
+│   ├── config.py
+│   │
+│   ├── backend/
+│   │   ├── __init__.py
+│   │   ├── api/
+│   │   │   ├── __init__.py
+│   │   │   ├── routes/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── analysis.py
+│   │   │   │   ├── ingestion.py
+│   │   │   │   ├── preprocessing.py
+│   │   │   │   └── transformation.py
+│   │   │   └── models/
+│   │   │       ├── __init__.py
+│   │   │       ├── requests.py
+│   │   │       └── responses.py
+│   │   │
+│   │   └── core/
+│   │       ├── __init__.py
+│   │       ├── context.py
+│   │       │
+│   │       ├── analysis/
+│   │       │   ├── __init__.py
+│   │       │   ├── descriptive/
+│   │       │   │   ├── __init__.py
+│   │       │   │   ├── base.py
+│   │       │   │   ├── pandas_descriptive.py
+│   │       │   │   ├── polars_descriptive.py
+│   │       │   │   └── pyspark_descriptive.py
+│   │       │   ├── diagnostic/
+│   │       │   │   ├── __init__.py
+│   │       │   │   ├── base.py
+│   │       │   │   ├── pandas_diagnostic.py
+│   │       │   │   ├── polars_diagnostic.py
+│   │       │   │   └── pyspark_diagnostic.py
+│   │       │   ├── predictive/
+│   │       │   │   ├── __init__.py
+│   │       │   │   ├── base.py
+│   │       │   │   ├── pandas_predictive.py
+│   │       │   │   ├── polars_predictive.py
+│   │       │   │   └── pyspark_predictive.py
+│   │       │   └── prescriptive/
+│   │       │       ├── __init__.py
+│   │       │       ├── base.py
+│   │       │       ├── pandas_prescriptive.py
+│   │       │       ├── polars_prescriptive.py
+│   │       │       └── pyspark_prescriptive.py
+│   │       │
+│   │       ├── engines/
+│   │       │   ├── __init__.py
+│   │       │   ├── base.py
+│   │       │   ├── pandas_engine.py
+│   │       │   ├── polars_engine.py
+│   │       │   └── pyspark_engine.py
+│   │       │
+│   │       ├── ingestion/
+│   │       │   ├── __init__.py
+│   │       │   ├── base.py
+│   │       │   ├── pandas_ingestion.py
+│   │       │   ├── polars_ingestion.py
+│   │       │   └── pyspark_ingestion.py
+│   │       │
+│   │       └── preprocessing/
+│   │           ├── __init__.py
+│   │           ├── base.py
+│   │           ├── pandas_preprocessing.py
+│   │           ├── polars_preprocessing.py
+│   │           └── pyspark_preprocessing.py
+│   │
+│   ├── frontend/
+│   │   ├── __init__.py
+│   │   ├── app.py
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── __init__.py
+│   │   │   ├── analysis.py
+│   │   │   ├── preprocessing.py
+│   │   │   └── upload.py
+│   │   │
+│   │   └── components/
+│   │       ├── __init__.py
+│   │       ├── analysis_rerenders.py
+│   │       ├── data_preview.py
+│   │       ├── engine_selector.py
+│   │       ├── file_uploader.py
+│   │       └── visualization.py
+│   │
+
+------------ Additional ----------
+│   ├── cli/
+│   │   ├── __init__.py
+│   │   └── commands.py
+│   │
+│   └── utils/
+│       ├── __init__.py
+│       ├── file_handlers.py
+│       ├── data_validators.py
+│       └── logging_config.py
+│
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_data/
+│   │   ├── sample_csv.csv
+│   │   ├── sample_json.json
+│   │   └── sample_excel.xlsx
+│   │
+│   ├── unit/
+│   │   ├── __init__.py
+│   │   ├── test_data_ingestion.py
+│   │   ├── test_data_preprocessing.py
+│   │   ├── test_descriptive_analysis.py
+│   │   ├── test_diagnostic_analysis.py
+│   │   ├── test_predictive_analysis.py
+│   │   └── test_prescriptive_analysis.py
+│   │
+│   └── integration/
+│       ├── __init__.py
+│       ├── test_api.py
+│       ├── test_frontend.py
+│       └── test_end_to_end.py
+│
+├── docs/
+│   ├── architecture.md
+│   ├── api_documentation.md
+│   ├── user_guide.md
+│   └── developer_guide.md
+│
+└── scripts/
+    ├── start_api.sh
+    ├── start_frontend.sh
+    └── run_tests.sh
 ```
 
 ### Running Tests
