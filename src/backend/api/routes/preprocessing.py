@@ -101,3 +101,6 @@ async def get_available_operations(engine_type: str):
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+  
