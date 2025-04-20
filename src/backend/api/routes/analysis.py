@@ -73,7 +73,6 @@ async def analyze_data(request: AnalysisRequest):
     from api.routes.ingestion import data_storage
     from api.routes.preprocessing import preprocessed_data_storage
     
-    
     # Check if file exists
     if request.file_id not in data_storage:
         raise HTTPException(status_code=404, detail=f"File not found with ID: {request.file_id}")
@@ -160,7 +159,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                 "title": "Outlier Detection",
                 "data": analysis_results["outlier_detection"]
             })
-            
+
         if "correlation_analysis" in analysis_results:
             visualizations.append({
                 "type": "bar_chart",
@@ -183,7 +182,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                 "title": "Feature Importance",
                 "data": analysis_results["feature_importance"]
             })
-            
+
         if "predictions" in analysis_results and analysis_results["predictions"]:
             actual_values = [pred["actual"] for pred in analysis_results["predictions"]]
             predicted_values = [pred["predicted"] for pred in analysis_results["predictions"]]
@@ -221,3 +220,4 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
             })
     
     return visualizations
+

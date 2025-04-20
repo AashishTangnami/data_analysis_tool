@@ -5,11 +5,23 @@ import requests
 import json
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
+
 from components.visualization import (
     render_distribution_plot, 
     render_correlation_heatmap,
     render_scatter_plot,
     render_categorical_plot
+)
+
+# Import the analysis renderers
+from components.analysis_renderers import (
+    render_diagnostic_results,
+    render_feature_importance,
+    render_correlation_analysis,
+    render_outlier_detection,
+    create_tabs_for_results
 )
 
 def render_descriptive_analysis_options():
@@ -250,6 +262,7 @@ def render_analysis_results():
         if st.session_state.analysis_type == "descriptive":
             render_descriptive_results()
         elif st.session_state.analysis_type == "diagnostic":
+            # Use the imported render_diagnostic_results function
             render_diagnostic_results()
         elif st.session_state.analysis_type == "predictive":
             render_predictive_results()
@@ -408,14 +421,6 @@ def render_descriptive_results():
                                     render_scatter_plot(df_preview, col1, col2)
                                 except Exception as e:
                                     st.error(f"Could not render scatter plot: {str(e)}")
-
-def render_diagnostic_results():
-    """Render diagnostic analysis results (placeholder)."""
-    st.info("Diagnostic analysis results rendering will be implemented in the next phase.")
-    
-    # Display raw results in JSON format
-    with st.expander("Raw Results"):
-        st.json(st.session_state.analysis_results)
 
 def render_predictive_results():
     """Render predictive analysis results (placeholder)."""
