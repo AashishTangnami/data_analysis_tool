@@ -1,4 +1,4 @@
-# core/ingestion/polars_ingestion.py
+
 import polars as pl
 import pandas as pd
 from typing import Any, Dict, Optional

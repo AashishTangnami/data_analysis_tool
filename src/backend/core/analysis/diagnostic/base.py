@@ -1,4 +1,3 @@
-# backend/core/analysis/diagnostic/base.py
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 

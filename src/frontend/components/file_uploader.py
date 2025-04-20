@@ -1,4 +1,3 @@
-# frontend/components/file_uploader.py
 import streamlit as st
 
 def render_file_uploader():

@@ -1,4 +1,4 @@
-# core/ingestion/pyspark_ingestion.py
+
 from typing import Any, Dict, Optional
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from core.ingestion.base import DataIngestionBase

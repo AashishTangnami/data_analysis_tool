@@ -1,4 +1,4 @@
-# core/ingestion/pandas_ingestion.py
+
 import pandas as pd
 from typing import Any, Dict, Optional
 from core.ingestion.base import DataIngestionBase
