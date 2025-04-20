@@ -2,6 +2,8 @@
 
 ***This project is under heavy development and is not yet ready for use.***
 
+***For the installation instructions go to below***
+
 ## 📊 Overview
 A state-of-the-art, comprehensive platform for advanced automated data analysis that supports the complete analytics lifecycle: descriptive, diagnostic, [Future : predictive, and prescriptive analytics]. This powerful tool allows users to upload data in a variety of formats and seamlessly progress through each stage of data analysis with sophisticated algorithms and visualizations.
 
