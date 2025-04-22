@@ -108,7 +108,7 @@ def render_operations_summary():
             with col2:
                 if st.button("🗑️", key=f"del_{i}"):
                     st.session_state.preprocessing_operations.pop(i)
-                    st.experimental_rerun()
+                    st.rerun()
         
         # Add apply all button
         if st.button("Apply All Operations", key="apply_all"):

@@ -65,6 +65,11 @@ data/processed/*
 .DS_Store
 Thumbs.db
 
+# ignore
+src/frontend/pages/utils
+src/backend/core/preprocessing/utils
+src/frontend/pages/structural_issues
+src/backend/core/preprocessing/column_mapper.py
 
 # ignore all the __pycache__ in the codebase
 **/__pycache__
