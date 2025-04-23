@@ -103,6 +103,8 @@ class PySparkPreprocessing(PreprocessingBase):
     
     def _drop_columns(self, data: SparkDataFrame, columns: List[str]) -> SparkDataFrame:
         """Drop specified columns from the DataFrame."""
+        if "all" in columns:
+            columns = data.columns.tolist()
         return data.drop(*columns)
     
     def _fill_missing(self, data: SparkDataFrame, columns: List[str], 

@@ -111,6 +111,8 @@ class PolarsPreprocessing(PreprocessingBase):
     
     def _drop_columns(self, data: pl.DataFrame, columns: List[str]) -> pl.DataFrame:
         """Drop specified columns from the DataFrame."""
+        if "all" in columns:
+            columns = data.columns.tolist()
         return data.drop(columns)
     
     def _fill_missing(self, data: pl.DataFrame, columns: Union[List[str], str], 
