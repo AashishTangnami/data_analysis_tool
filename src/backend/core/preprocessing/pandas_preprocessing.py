@@ -100,6 +100,8 @@ class PandasPreprocessing(PreprocessingBase):
     
     def _drop_columns(self, data: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
         """Drop specified columns from the DataFrame."""
+        if "all" in columns:
+            columns = data.columns.tolist()
         return data.drop(columns=columns)
     
     def _fill_missing(self, data: pd.DataFrame, columns: Union[List[str], str], 
@@ -138,6 +140,16 @@ class PandasPreprocessing(PreprocessingBase):
         """Encode categorical variables."""
         result = data.copy()
         
+        # Handle 'all' selection
+        if "all" in columns:
+            columns = [
+                col for col in data.columns
+                if data[col].dtype == 'object' or pd.api.types.is_categorical_dtype(data[col])
+            ]
+
+        if not columns:
+            return result
+
         if method == "one_hot":
             # Use pandas get_dummies for one-hot encoding
             dummies = pd.get_dummies(data[columns], prefix=columns)
