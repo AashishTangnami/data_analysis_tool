@@ -1,3 +1,4 @@
+
 import os
 import tempfile
 import shutil
@@ -72,26 +73,18 @@ async def upload_file(
 ):
     """
     Upload a file and process it with the selected engine.
-    
-    Args:
-        file: The file to upload
-        engine_type: The engine to use for processing (pandas, polars, pyspark)
-        
-    Returns:
-        DataResponse with file_id and summary information
     """
     file, file_type = engine_file_validation
     
-    # Create a temporary file
+    # Create a temporary file with increased buffer size
     temp_dir = tempfile.mkdtemp()
     temp_file_path = os.path.join(temp_dir, file.filename)
     
     try:
-        # Save uploaded file to temp location
+        # Use larger chunks for file writing
+        CHUNK_SIZE = 1024 * 1024  # 1MB chunks
         with open(temp_file_path, "wb") as buffer:
-            # Read in chunks to handle large files
-            chunk_size = 1024 * 1024  # 1MB chunks
-            while chunk := await file.read(chunk_size):
+            while chunk := await file.read(CHUNK_SIZE):
                 buffer.write(chunk)
         
         # Initialize engine context with selected engine
@@ -198,7 +191,6 @@ async def cleanup_temp_file(temp_dir: str, file_id: str, delay_seconds: int = 36
         file_id: ID of the file to remove from storage
         delay_seconds: Delay before cleanup (default: 1 hour)
     """
-    # Use async sleep instead of blocking time.sleep
     await asyncio.sleep(delay_seconds)
     
     # Clean up temp directory and storage entries
