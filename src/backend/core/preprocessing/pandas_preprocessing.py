@@ -144,7 +144,10 @@ class PandasPreprocessing(PreprocessingBase):
         if "all" in columns:
             columns = [
                 col for col in data.columns
-                if data[col].dtype == 'object' or pd.api.types.is_categorical_dtype(data[col])
+                if (
+                    (data[col].dtype == 'object' or pd.api.types.is_categorical_dtype(data[col]))
+                    and not pd.api.types.is_datetime64_any_dtype(data[col])
+                )
             ]
 
         if not columns:
