@@ -29,7 +29,7 @@ class PandasDiagnosticAnalysis(DiagnosticAnalysisBase):
         # Extract parameters
         target_column = params.get("target_column")
         feature_columns = params.get("feature_columns", [])
-        run_feature_importance = params.get("run_feature_importance", True)
+        # run_feature_importance = params.get("run_feature_importance", True)
         run_outlier_detection = params.get("run_outlier_detection", True)
         
         # Validate inputs
@@ -46,7 +46,7 @@ class PandasDiagnosticAnalysis(DiagnosticAnalysisBase):
         
         # Initialize results
         results = {
-            "feature_importance": {},
+            # "feature_importance": {},
             "outlier_detection": {},
             "correlation_analysis": {}
         }
@@ -60,7 +60,8 @@ class PandasDiagnosticAnalysis(DiagnosticAnalysisBase):
             raise ValueError("After dropping NA values, no data remains for analysis")
         
         # Feature importance analysis
-        if run_feature_importance:
+        '''
+        if run_feature_importance is :
             try:
                 # Determine if classification or regression
                 is_categorical = False
@@ -105,7 +106,7 @@ class PandasDiagnosticAnalysis(DiagnosticAnalysisBase):
             
             except Exception as e:
                 results["feature_importance"] = {"error": str(e)}
-        
+        '''
         # Outlier detection
         if run_outlier_detection:
             outlier_results = {}
