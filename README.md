@@ -161,15 +161,14 @@ DATABASE_URL=your_database_url
 ### Web Interface
 1. Start the web server:
    ```bash
-   python src/backend/main.py
+   src/backend/ uv run main.py OR uvicorn main:app --host 8000 OR fastapi dev main.py
+   src/frontend/ streamlit run app.py
+   ------
    ```
-   - Confirm: Open your browser at http://localhost:8000
-2. Run streamlit application
-  ```bash
-  streamlit run app.py
-  ```
-3. Upload your data file
-4. Navigate through the analysis tabs
+2. Open your browser at http://localhost:8000 for API
+3. Open your browser at http://localhost:8501 for User Interface
+4. Upload your data file
+5. Navigate through the analysis tabs
 
 ### API Usage
 ```python
