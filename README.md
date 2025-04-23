@@ -161,9 +161,13 @@ DATABASE_URL=your_database_url
 ### Web Interface
 1. Start the web server:
    ```bash
-   ------
+   python src/backend/main.py
    ```
-2. Open your browser at http://localhost:8000
+   - Confirm: Open your browser at http://localhost:8000
+2. Run streamlit application
+  ```bash
+  streamlit run app.py
+  ```
 3. Upload your data file
 4. Navigate through the analysis tabs
 
