@@ -27,6 +27,26 @@ def render_preprocessing_interface():
                         if "columns" in param_name:
                             # Multi-select for columns
                             all_columns = st.session_state.data_summary.get("columns", [])
+                            col_dtypes = st.session_state.data_summary.get("dtypes", {})
+
+                            # Infer simplified column types based on dtypes
+                            column_types = {}
+                            for col, dtype in col_dtypes.items():
+                                if "int" in dtype or "float" in dtype:
+                                    column_types[col] = "numeric"
+                                elif "object" in dtype or "category" in dtype:
+                                    column_types[col] = "categorical"
+                                elif "datetime" in dtype:
+                                    column_types[col] = "datetime"
+                                else:
+                                    column_types[col] = "other"
+
+                            # Showcase categorical columns only for encoding operations
+                            if "encode" in op_name.lower():
+                                all_columns = [
+                                    col for col in all_columns if column_types.get(col) == "categorical"
+                                ]
+
                             params[param_name] = st.multiselect(
                                 f"{param_name.replace('_', ' ').title()}: {param_desc}",
                                 options=["all"] + all_columns,
@@ -131,6 +151,11 @@ def render_operations_summary():
                     st.session_state.original_summary = result["original_summary"]
                     st.session_state.processed_summary = result["processed_summary"]
                     st.session_state.preprocessing_applied = True
+
+                    # Update the columns list after preprocessing
+                    new_columns = result.get("processed_summary", {}).get("columns", [])
+                    if new_columns:
+                        st.session_state.data_summary["columns"] = new_columns
                     
                     st.success("Preprocessing operations applied successfully!")
                     st.rerun()
