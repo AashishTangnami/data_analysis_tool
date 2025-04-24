@@ -43,6 +43,7 @@ dependencies = [
      "polars>=1.27.1",
      "requests>=2.32.3",
      "aiofiles>=24.1.0",
+     "pyarrow>=19.0.1",
 ]
 
 [project.optional-dependencies]

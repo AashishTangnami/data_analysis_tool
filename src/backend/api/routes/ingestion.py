@@ -5,11 +5,9 @@ import shutil
 import asyncio
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends
-from pydantic import BaseModel, validator
 from core.context import EngineContext
-from api.models.responses import DataResponse, ErrorResponse
-from enum import Enum
-# from ....shared.constants import EngineType, FileType
+from api.models.responses import DataResponse
+from src.shared.constants import EngineType, FileType
 
 router = APIRouter()
 
@@ -20,18 +18,6 @@ data_storage = {}
 
 # Mutex for protecting shared storage
 storage_lock = asyncio.Lock()
-
-class FileType(str, Enum):
-    """Enum for supported file types."""
-    CSV = "csv"
-    EXCEL = "excel"
-    JSON = "json"
-
-class EngineType(str, Enum):
-    """Enum for supported data processing engines."""
-    PANDAS = "pandas"
-    POLARS = "polars"
-    PYSPARK = "pyspark"
     
 def validate_engine_type(engine_type: str = Form("pandas")):
     """Validate that the engine type is supported."""

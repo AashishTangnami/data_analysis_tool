@@ -1,32 +1,11 @@
 from typing import Dict, Any, List
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from core.context import EngineContext
 from api.models.responses import AnalysisResponse
-# from shared.constants import EngineType, AnalysisType
+from src.shared.constants import EngineType, AnalysisType
 
 router = APIRouter()
-
-from enum import Enum
-
-class EngineType(str, Enum):
-    """Enum for supported engine types."""
-    PANDAS = "pandas"
-    POLARS = "polars"
-    PYSPARK = "pyspark"
-
-class FileType(str, Enum):
-    """Enum for supported file types."""
-    CSV = "csv"
-    EXCEL = "excel"
-    JSON = "json"
-
-class AnalysisType(str, Enum):
-    """Enum for supported analysis types."""
-    DESCRIPTIVE = "descriptive"
-    DIAGNOSTIC = "diagnostic"
-    PREDICTIVE = "predictive"
-    PRESCRIPTIVE = "prescriptive"
 
 class AnalysisRequest(BaseModel):
     """Request model for analysis operations"""
@@ -35,7 +14,7 @@ class AnalysisRequest(BaseModel):
     params: Dict[str, Any] = Field({}, description="Parameters for the analysis")
     use_preprocessed: bool = Field(False, description="Whether to use preprocessed data if available")
     
-    @validator('analysis_type')
+    @field_validator('analysis_type')
     def validate_analysis_type(cls, v):
         """Validate that the analysis type is supported."""
         try:
@@ -44,7 +23,7 @@ class AnalysisRequest(BaseModel):
             supported_types = [t.value for t in AnalysisType]
             raise ValueError(f"Unsupported analysis type: {v}. Supported types: {', '.join(supported_types)}")
         
-    @validator('file_id')
+    @field_validator('file_id')
     def validate_file_id(cls, v):
         """Validate that the file ID has a valid engine type."""
         try:

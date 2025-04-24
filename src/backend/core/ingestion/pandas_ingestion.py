@@ -172,7 +172,8 @@ class PandasIngestion(DataIngestionBase):
         """
         result = df.copy()
         
-        start_mem = result.memory_usage(deep=True).sum() / 1024**2
+        # Uncomment to check how much memory has been reduced.
+        # start_mem = result.memory_usage(deep=True).sum() / 1024**2
         
         # Process numeric columns
         numeric_columns = result.select_dtypes(include=['int', 'float']).columns
@@ -250,9 +251,9 @@ class PandasIngestion(DataIngestionBase):
             # Convert to datetime64[ns] for better memory usage
             result[col] = pd.to_datetime(result[col])
         
-        end_mem = result.memory_usage(deep=True).sum() / 1024**2
-        reduction = (start_mem - end_mem) / start_mem
+        # end_mem = result.memory_usage(deep=True).sum() / 1024**2
+        # reduction = (start_mem - end_mem) / start_mem
         
-        print(f"Memory usage decreased from {start_mem:.2f} MB to {end_mem:.2f} MB ({reduction:.2%} reduction)")
+        # print(f"Memory usage decreased from {start_mem:.2f} MB to {end_mem:.2f} MB ({reduction:.2%} reduction)")
         
         return result
