@@ -140,7 +140,8 @@ def configure_logging(module_name: str):
 
     # Create formatters
     console_formatter = ColoredFormatter(CONSOLE_FORMAT, DATE_FORMAT)
-    file_formatter = logging.Formatter(FILE_FORMAT, DATE_FORMAT)
+    # Use the same ColoredFormatter for the file to get colorized logs
+    file_formatter = ColoredFormatter(FILE_FORMAT, DATE_FORMAT)
 
     # Console handler with colored output
     console_handler = logging.StreamHandler(sys.stdout)
@@ -295,5 +296,3 @@ def test_logging():
     print(footer)
     print(separator)
 
-# Uncomment to test logging when this module is imported
-# test_logging()
