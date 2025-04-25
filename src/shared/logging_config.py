@@ -140,7 +140,8 @@ def configure_logging(module_name: str):
 
     # Create formatters
     console_formatter = ColoredFormatter(CONSOLE_FORMAT, DATE_FORMAT)
-    file_formatter = logging.Formatter(FILE_FORMAT, DATE_FORMAT)
+    # Use the same ColoredFormatter for the file to get colorized logs
+    file_formatter = ColoredFormatter(FILE_FORMAT, DATE_FORMAT)
 
     # Console handler with colored output
     console_handler = logging.StreamHandler(sys.stdout)
@@ -250,50 +251,3 @@ def get_logger(name: str):
 def get_context_logger(name: str):
     """Get a context logger with the specified name."""
     return ContextLogger(name)
-
-def test_logging():
-    """Test the beautiful, production-standard logging configuration."""
-    # Create a colorful header
-    header = f"{Back.BLUE}{Fore.WHITE}{Style.BRIGHT} LOGGING TEST {Style.RESET_ALL}"
-    separator = f"{Fore.BLUE}{'='*80}{Style.RESET_ALL}"
-
-    print("\n" + separator)
-    print(header)
-    print(separator)
-
-    # Print information about the log file
-    print(f"\n{Fore.CYAN}Log file path:{Style.RESET_ALL} {LOG_FILE}")
-
-    # Write test log messages
-    logger = get_logger("test_logging")
-    logger.debug("This is a debug message")
-    logger.info("This is an info message")
-    logger.warning("This is a warning message")
-    logger.error("This is an error message")
-
-    # Test context logging
-    context_logger = get_context_logger("test_context_logging")
-    context_logger.add_context(user="test_user", action="login").info("User logged in")
-
-    # Try to read and display the last few lines of the log file
-    try:
-        if os.path.exists(LOG_FILE):
-            with open(LOG_FILE, 'r') as f:
-                lines = f.readlines()
-                if lines:
-                    print(f"\n{Fore.GREEN}Last {min(5, len(lines))} lines from the log file:{Style.RESET_ALL}")
-                    for line in lines[-5:]:
-                        print(f"  {line.strip()}")
-        else:
-            print(f"\n{Fore.YELLOW}Log file does not exist yet.{Style.RESET_ALL}")
-    except Exception as e:
-        print(f"\n{Fore.RED}Could not read log file: {str(e)}{Style.RESET_ALL}")
-
-    # Create a colorful footer
-    footer = f"{Back.GREEN}{Fore.BLACK}{Style.BRIGHT} TEST COMPLETE {Style.RESET_ALL}"
-    print("\n" + separator)
-    print(footer)
-    print(separator)
-
-# Uncomment to test logging when this module is imported
-# test_logging()
