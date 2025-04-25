@@ -47,11 +47,19 @@ try:
     # Start from the current file's directory
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Go up to the src directory
-    src_dir = os.path.dirname(current_dir)
-
-    # Go up one more level to the project root
-    project_root = os.path.dirname(src_dir)
+    # Try multiple approaches to find the project root
+    # Approach 1: Go up from src/shared to src, then to project root
+    if os.path.basename(current_dir) == 'shared':
+        src_dir = os.path.dirname(current_dir)
+        if os.path.basename(src_dir) == 'src':
+            project_root = os.path.dirname(src_dir)
+        else:
+            project_root = os.path.dirname(current_dir)  # Fallback
+    else:
+        # Approach 2: Look for common project directories
+        project_root = current_dir
+        while project_root and not os.path.exists(os.path.join(project_root, 'src')) and os.path.dirname(project_root) != project_root:
+            project_root = os.path.dirname(project_root)
 
     # Create the data/logs directory at the project root
     LOG_DIR = os.path.join(project_root, 'data', 'logs')
