@@ -76,6 +76,19 @@ class EngineContext:
         """
         return self._engine.load_data(file_path, file_type, **kwargs)
     
+    def apply_single_operation(self, data: Any, operation: Dict[str, Any]) -> Any:
+        """
+        Apply a single preprocessing operation using the current engine.
+        
+        Args:
+            data: Data in the engine's native format
+            operation: Single preprocessing operation to apply
+            
+        Returns:
+            Processed data in the engine's native format
+        """
+        return self._engine.apply_single_operation(data, operation)
+
     def get_data_summary(self, data: Any) -> Dict[str, Any]:
         """
         Generate a summary of the data using the current engine.

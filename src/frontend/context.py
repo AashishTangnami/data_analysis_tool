@@ -3,7 +3,7 @@ Frontend context for managing engine selection and API communication.
 Implements the Strategy pattern for the frontend.
 """
 import streamlit as st
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from services.api_client import ApiClient
 from src.shared.logging_config import get_context_logger
 
@@ -110,6 +110,46 @@ class FrontendContext:
             ).exception(f"Upload error: {str(e)}")
             logger.clear_context()
             raise
+
+    def preview_operation(self, file_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Preview a preprocessing operation via the API.
+
+        Args:
+            file_id: ID of the file to preprocess
+            operation: Operation to preview
+
+        Returns:
+            Dict with preview information
+        """
+        try:
+            # Delegate to the API client
+            return self.api_client.preview_operation(file_id, operation)
+        except Exception as e:
+            logger.error(f"Error previewing operation: {str(e)}")
+            raise
+
+    def apply_single_operation(self, file_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply a single preprocessing operation via the API.
+
+        Args:
+            file_id: ID of the file to preprocess
+            operation: Operation to apply
+
+        Returns:
+            Dict with operation result
+        """
+        try:
+            # Delegate to the API client
+            return self.api_client.apply_single_operation(file_id, operation)
+        except Exception as e:
+            logger.error(f"Error applying operation: {str(e)}")
+            raise
+
+    # These methods were duplicated and have been removed
+    # The implementations at lines 373-408 and 410-438 are kept instead
+
 
     def preprocess_data(self, operations: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -272,4 +312,72 @@ class FrontendContext:
 
         except Exception as e:
             logger.error(f"Error transforming data: {str(e)}")
+            raise
+
+
+    def undo_operation(self, operation_index: int) -> Dict[str, Any]:
+        """
+        Undo a specific operation in the history.
+
+        Args:
+            operation_index: Index of the operation to undo
+
+        Returns:
+            Dict with updated data information
+        """
+        try:
+            if "file_id" not in st.session_state or not st.session_state.file_id:
+                raise Exception("No file loaded. Please upload a file first.")
+
+            if "operation_history" not in st.session_state or operation_index >= len(st.session_state.operation_history):
+                raise Exception("Invalid operation index.")
+
+            # Use the API client to undo the operation
+            result = self.api_client.undo_operation(
+                st.session_state.file_id,
+                operation_index
+            )
+
+            # Update session state
+            st.session_state.data_preview = result.get("preview", [])
+            st.session_state.data_summary = result.get("processed_summary", {})
+
+            # Remove the operation from history
+            st.session_state.operation_history.pop(operation_index)
+
+            logger.info(f"Operation at index {operation_index} undone for file: {st.session_state.file_id}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Undo operation error: {str(e)}")
+            raise
+
+    def clear_all_operations(self) -> Dict[str, Any]:
+        """
+        Clear all operations and revert to original data.
+
+        Returns:
+            Dict with original data information
+        """
+        try:
+            if "file_id" not in st.session_state or not st.session_state.file_id:
+                raise Exception("No file loaded. Please upload a file first.")
+
+            # Use the API client to clear all operations
+            result = self.api_client.clear_all_operations(
+                st.session_state.file_id
+            )
+
+            # Update session state
+            st.session_state.data_preview = result.get("preview", [])
+            st.session_state.data_summary = result.get("original_summary", {})
+
+            # Clear operation history
+            st.session_state.operation_history = []
+
+            logger.info(f"All operations cleared for file: {st.session_state.file_id}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Clear operations error: {str(e)}")
             raise

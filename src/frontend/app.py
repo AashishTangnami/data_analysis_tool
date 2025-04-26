@@ -1,6 +1,4 @@
 import streamlit as st
-import requests
-import json
 from context import FrontendContext
 from components.engine_selector import render_engine_selector
 from components.file_uploader import render_file_uploader
@@ -59,7 +57,7 @@ def main():
 
     # Add engine selector in the sidebar (always visible)
     st.sidebar.subheader("Engine Selection")
-    current_engine = render_engine_selector()
+    render_engine_selector()  # Engine selection is handled via session state
 
     # Display status information in the sidebar
     st.sidebar.subheader("Status")
@@ -82,9 +80,6 @@ def main():
         if "file_id" not in st.session_state or st.session_state.file_id is None:
             st.warning("Please upload a file first.")
             render_upload_page()
-        # if st.session_state.file_id is None:
-        #     st.warning("Please upload a file first.")
-        #     render_upload_page()
         else:
             render_preprocessing_page()
     elif page == "Analysis":
@@ -144,7 +139,3 @@ if __name__ == "__main__":
 
     # Run the main application
     main()
-
-
-
-

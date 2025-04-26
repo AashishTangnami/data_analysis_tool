@@ -47,6 +47,58 @@ class PandasPreprocessing(PreprocessingBase):
         
         return result
     
+    def is_operation_valid(self, data: pd.DataFrame, operation: Dict, operation_history: List[Dict]) -> bool:
+        """Check if an operation is valid given the current data state and operation history."""
+        op_type = operation.get("type")
+        params = operation.get("params", {})
+        
+        if op_type == "drop_columns":
+            # Check if columns exist
+            columns = params.get("columns", [])
+            if "all" in columns:
+                return len(data.columns) > 0
+            return all(col in data.columns for col in columns)
+        
+        elif op_type == "fill_missing":
+            # Check if there are missing values to fill
+            columns = params.get("columns", [])
+            if "all" in columns:
+                return data.isna().any().any()
+            return any(data[col].isna().any() for col in columns if col in data.columns)
+        
+        elif op_type == "drop_missing":
+            # Check if there are missing values to drop
+            return data.isna().any().any()
+        
+        elif op_type == "encode_categorical":
+            # Check if categorical columns exist
+            columns = params.get("columns", [])
+            categorical_cols = [
+                col for col in data.columns
+                if (data[col].dtype == 'object' or pd.api.types.is_categorical_dtype(data[col]))
+            ]
+            if "all" in columns:
+                return len(categorical_cols) > 0
+            return any(col in categorical_cols for col in columns)
+        
+        return True
+        
+    # Add a method to get available columns (excluding dropped ones)
+    def get_available_columns(self, data: pd.DataFrame, operation_history: List[Dict]) -> List[str]:
+        """Get available columns considering previous drop operations."""
+        available_columns = data.columns.tolist()
+        
+        # Check for dropped columns in operation history
+        for op in operation_history:
+            if op.get("type") == "drop_columns" and "columns" in op.get("params", {}):
+                dropped_cols = op["params"]["columns"]
+                if "all" in dropped_cols:
+                    return []  # All columns were dropped
+                available_columns = [col for col in available_columns if col not in dropped_cols]
+        
+        return available_columns
+
+
     def get_available_operations(self) -> Dict[str, Dict[str, Any]]:
         """
         Get a dictionary of available preprocessing operations.
@@ -136,7 +188,7 @@ class PandasPreprocessing(PreprocessingBase):
         return data.dropna(how=how)
     
     def _encode_categorical(self, data: pd.DataFrame, columns: List[str], 
-                           method: str = "one_hot") -> pd.DataFrame:
+                       method: str = "one_hot", target_column: str = None) -> pd.DataFrame:
         """Encode categorical variables."""
         result = data.copy()
         
@@ -161,9 +213,82 @@ class PandasPreprocessing(PreprocessingBase):
             # Use pandas factorize for label encoding
             for col in columns:
                 result[col], _ = pd.factorize(data[col])
+        elif method == "ordinal":
+            # For ordinal encoding, we need a mapping
+            for col in columns:
+                categories = data[col].dropna().unique()
+                mapping = {cat: i for i, cat in enumerate(categories)}
+                result[col] = data[col].map(mapping)
+                # Handle NaN values
+                if data[col].isna().any():
+                    result[col] = result[col].fillna(-1)
+        elif method == "count":
+            # Count encoding
+            for col in columns:
+                count_map = data[col].value_counts().to_dict()
+                result[col] = data[col].map(count_map)
+        elif method == "target":
+            # Target encoding requires a target column
+            if target_column is None or target_column not in data.columns:
+                raise ValueError("Target encoding requires a valid target column")
+            
+            for col in columns:
+                # Calculate mean target value for each category
+                target_means = data.groupby(col)[target_column].mean().to_dict()
+                result[col] = data[col].map(target_means)
+        elif method == "leave_one_out":
+            # Simplified leave-one-out implementation
+            if target_column is None or target_column not in data.columns:
+                raise ValueError("Leave-one-out encoding requires a valid target column")
+            
+            for col in columns:
+                # For each row, calculate mean excluding the current row
+                result[col] = data.apply(
+                    lambda x: data[(data[col] == x[col]) & (data.index != x.name)][target_column].mean()
+                    if len(data[(data[col] == x[col]) & (data.index != x.name)]) > 0
+                    else data[target_column].mean(),
+                    axis=1
+                )
+        elif method == "catboost":
+            # Simplified CatBoost encoding
+            if target_column is None or target_column not in data.columns:
+                raise ValueError("CatBoost encoding requires a valid target column")
+            
+            for col in columns:
+                # Create a random permutation
+                np.random.seed(42)
+                random_order = np.random.permutation(len(data))
+                ordered_data = data.iloc[random_order].copy()
                 
-        # More encoding methods can be added here
+                # Apply ordered target statistics
+                ordered_data[f'{col}_encoded'] = 0.0
+                prior = 0.5  # Prior parameter
                 
+                for i in range(len(ordered_data)):
+                    current_category = ordered_data.iloc[i][col]
+                    past_data = ordered_data.iloc[:i]
+                    
+                    if len(past_data) == 0:
+                        # For first observation, use prior
+                        encoded_value = prior
+                    else:
+                        category_data = past_data[past_data[col] == current_category]
+                        if len(category_data) == 0:
+                            # If category not seen before, use prior
+                            encoded_value = prior
+                        else:
+                            # Calculate statistic
+                            count_in_class = sum(category_data[target_column])
+                            total_count = len(category_data)
+                            encoded_value = (count_in_class + prior) / (total_count + 1)
+                    
+                    ordered_data.iloc[i, ordered_data.columns.get_loc(f'{col}_encoded')] = encoded_value
+                
+                # Restore original order and update result
+                reverse_mapping = {new_idx: old_idx for old_idx, new_idx in enumerate(random_order)}
+                ordered_indices = [reverse_mapping[i] for i in range(len(data))]
+                result[col] = ordered_data.iloc[ordered_indices][f'{col}_encoded'].values
+        
         return result
     
     def _scale_numeric(self, data: pd.DataFrame, columns: List[str], 

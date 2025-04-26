@@ -3,7 +3,7 @@ API Client for communicating with the backend API.
 """
 import requests
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List, Optional
 from src.shared.logging_config import get_context_logger
 
 # Get context logger for this module
@@ -19,7 +19,7 @@ class ApiClient:
         """Initialize the API client with the base URL."""
         self.base_url = base_url
 
-    def _handle_response(self, response, error_message: str = "API request failed", request_info: Dict[str, Any] = None):
+    def _handle_response(self, response, error_message: str = "API request failed", request_info: Optional[Dict[str, Any]] = None):
         """
         Process API response and handle errors consistently.
 
@@ -154,6 +154,54 @@ class ApiClient:
             ).exception(f"Error uploading file: {str(e)}")
             logger.clear_context()
             raise
+
+    def preview_operation(self, file_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Preview a preprocessing operation via the API.
+
+        Args:
+            file_id: ID of the file to preprocess
+            operation: Operation to preview
+
+        Returns:
+            Dict with preview information
+        """
+        try:
+            payload = {
+                "file_id": file_id,
+                "operation": operation
+            }
+
+            response = requests.post(f"{self.base_url}/preprocessing/preview_operation", json=payload)
+            return self._handle_response(response, "Operation preview failed")
+
+        except Exception as e:
+            logger.error(f"Error previewing operation: {str(e)}")
+            raise Exception(f"Failed to preview operation: {str(e)}")
+
+    def apply_single_operation(self, file_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply a single preprocessing operation to data via the API.
+
+        Args:
+            file_id: ID of the file to preprocess
+            operation: Single preprocessing operation to apply
+
+        Returns:
+            Dict with operation result information
+        """
+        try:
+            payload = {
+                "file_id": file_id,
+                "operation": operation
+            }
+
+            response = requests.post(f"{self.base_url}/preprocessing/apply_operation", json=payload)
+            return self._handle_response(response, "Operation application failed")
+
+        except Exception as e:
+            logger.error(f"Error applying operation: {str(e)}")
+            raise Exception(f"Failed to apply operation: {str(e)}")
 
     # Preprocessing Operations
     def get_preprocessing_operations(self, engine_type: str) -> Dict[str, Any]:

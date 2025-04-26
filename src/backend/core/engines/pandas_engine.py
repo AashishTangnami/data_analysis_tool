@@ -43,6 +43,41 @@ class PandasEngine(EngineBase):
         
         return self.ingestion.load_data(file_path, file_type, **kwargs)
     
+    def apply_single_operation(self, data: pd.DataFrame, operation: Dict[str, Any]) -> pd.DataFrame:
+        """
+        Apply a single preprocessing operation to a pandas DataFrame.
+        
+        Args:
+            data: pandas DataFrame to process
+            operation: Single preprocessing operation to apply
+            
+        Returns:
+            Processed pandas DataFrame
+        """
+        if not self.preprocessor:
+            from core.preprocessing.pandas_preprocessing import PandasPreprocessing
+            self.preprocessor = PandasPreprocessing()
+        
+        # Apply the single operation
+        op_type = operation.get("type")
+        params = operation.get("params", {})
+        
+        # Use the appropriate method based on operation type
+        if op_type == "drop_columns":
+            return self.preprocessor._drop_columns(data, **params)
+        elif op_type == "fill_missing":
+            return self.preprocessor._fill_missing(data, **params)
+        elif op_type == "drop_missing":
+            return self.preprocessor._drop_missing(data, **params)
+        elif op_type == "encode_categorical":
+            return self.preprocessor._encode_categorical(data, **params)
+        elif op_type == "scale_numeric":
+            return self.preprocessor._scale_numeric(data, **params)
+        elif op_type == "apply_function":
+            return self.preprocessor._apply_function(data, **params)
+        else:
+            raise ValueError(f"Unsupported operation type: {op_type}")
+
     def get_data_summary(self, data: pd.DataFrame) -> Dict[str, Any]:
         """
         Generate a summary of the data.
