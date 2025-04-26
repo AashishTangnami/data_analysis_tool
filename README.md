@@ -28,7 +28,7 @@ A state-of-the-art, comprehensive platform for advanced automated data analysis 
 - [x] ✅ **Descriptive Analytics**  
   Gain insights into past data with detailed summaries and visualizations.
   
-- [ ] 🔄 **Diagnostic Analytics**  
+- [ ] ✅ **Diagnostic Analytics**  
   Identify the root causes of trends and anomalies in your data.
 
 - [ ] 🔄 **Predictive Analytics** *(Coming Soon)*  
