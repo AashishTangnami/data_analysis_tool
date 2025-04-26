@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
-from src.shared.logging_config import get_logger
+from src.shared.logging_config import get_context_logger
 
 # Get logger for this module
-logger = get_logger(__name__)
+logger = get_context_logger(__name__)
 
 from components.visualization import (
     render_distribution_plot,
@@ -595,6 +595,22 @@ def run_analysis(analysis_type, params):
         # Determine whether to use preprocessed data
         use_preprocessed = "use_preprocessed" in st.session_state and st.session_state.use_preprocessed
 
+        # Set file context for logging
+        if "file_id" in st.session_state:
+            logger.set_file_context(
+                file_id=st.session_state.file_id,
+                file_name=st.session_state.file_id.split('_', 1)[1] if '_' in st.session_state.file_id else st.session_state.file_id
+            )
+
+        # Set request context for logging
+        logger.set_request_context(
+            method="POST",
+            endpoint=f"/api/analysis/analyze"
+        )
+
+        # Log analysis start
+        logger.info(f"Starting {analysis_type} analysis with params: {params}, use_preprocessed={use_preprocessed}")
+
         # Use the frontend context to run the analysis
         result = frontend_context.analyze_data(
             analysis_type=analysis_type,
@@ -602,12 +618,19 @@ def run_analysis(analysis_type, params):
             use_preprocessed=use_preprocessed
         )
 
+        # Log success
+        logger.success(f"{analysis_type.capitalize()} analysis completed successfully")
+
         # Success message and refresh
         st.success(f"{analysis_type.capitalize()} analysis completed successfully!")
         st.rerun()
 
     except Exception as e:
-        logger.error(f"Analysis error: {str(e)}")
+        # Log failure with context
+        logger.failure(f"Analysis error: {str(e)}")
+        logger.exception("Analysis failed with exception")
+
+        # Show error to user
         st.error(f"An error occurred: {str(e)}")
 
 def render_analysis_results():
@@ -799,9 +822,18 @@ def render_analysis_page():
     """Render the complete analysis page."""
     st.title("Data Analysis")
 
+    # Set file context for logging
+    file_name = st.session_state.file_id.split('_', 1)[1]
+    logger.set_file_context(
+        file_id=st.session_state.file_id,
+        file_name=file_name
+    )
+
+    logger.info(f"Rendering analysis page for file: {st.session_state.file_id}")
+
     # Display current data info
     st.write(f"**Current Engine:** {st.session_state.engine_type}")
-    st.write(f"**File:** {st.session_state.file_id.split('_', 1)[1]}")
+    st.write(f"**File:** {file_name}")
 
     if "use_preprocessed" in st.session_state and st.session_state.use_preprocessed:
         st.write("**Using:** Preprocessed Data")

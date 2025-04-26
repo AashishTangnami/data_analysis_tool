@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-from src.shared.logging_config import get_logger
+from src.shared.logging_config import get_context_logger
 
 # Get logger for this module
-logger = get_logger(__name__)
+logger = get_context_logger(__name__)
 
 def render_preprocessing_interface():
     """Render the preprocessing interface with available operations."""
@@ -203,11 +203,21 @@ def render_preprocessing_page():
     st.title("Data Preprocessing")
 
     engine_type = st.session_state.file_id.split("_")[0]
+    file_name = st.session_state.file_id.split('_', 1)[1]
+
+    # Set file context for logging
+    logger.set_file_context(
+        file_id=st.session_state.file_id,
+        file_name=file_name
+    )
+
+    logger.info(f"Rendering preprocessing page for file: {st.session_state.file_id}")
+
     st.write(f"**Current Engine:** {engine_type}")
 
     # Display current data info
     st.write(f"**Current Engine:** {st.session_state.engine_type}")
-    st.write(f"**File:** {st.session_state.file_id.split('_', 1)[1]}")
+    st.write(f"**File:** {file_name}")
 
     # Create columns for original data preview
     st.subheader("Original Data Preview")

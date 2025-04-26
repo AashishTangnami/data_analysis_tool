@@ -1,14 +1,14 @@
 from typing import Dict, Any, List
-import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from core.context import EngineContext
 from api.models.responses import AnalysisResponse
 from src.shared.constants import EngineType, AnalysisType
 from src.shared.session import SessionManager
+from src.shared.logging_config import get_context_logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = get_context_logger(__name__)
 
 router = APIRouter()
 
@@ -72,6 +72,18 @@ async def analyze_data(request: AnalysisRequest):
         if data is None:
             raise HTTPException(status_code=404, detail=f"File not found with ID: {request.file_id}")
 
+    # Set file context for logging
+    logger.set_file_context(
+        file_id=request.file_id,
+        file_type=getattr(data, 'dtypes', {}).get('__file_type__', 'unknown')
+    )
+
+    # Set request context for logging
+    logger.set_request_context(
+        method="POST",
+        endpoint="/api/analysis/analyze"
+    )
+
     try:
         logger.info(f"Analyzing data for file_id: {request.file_id}, analysis type: {request.analysis_type}")
 
@@ -91,7 +103,7 @@ async def analyze_data(request: AnalysisRequest):
         # Generate visualization data based on analysis type and results
         visualizations = generate_visualizations(request.analysis_type, analysis_results)
 
-        logger.info(f"Analysis completed successfully for file_id: {request.file_id}")
+        logger.success(f"Analysis completed successfully for file_id: {request.file_id}")
 
         return AnalysisResponse(
             file_id=request.file_id,
@@ -102,7 +114,8 @@ async def analyze_data(request: AnalysisRequest):
         )
 
     except Exception as e:
-        logger.error(f"Error analyzing data: {str(e)}")
+        logger.failure(f"Error analyzing data: {str(e)}")
+        logger.exception("Analysis failed with exception")
         raise HTTPException(status_code=400, detail=str(e))
 
 def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
