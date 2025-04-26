@@ -1,13 +1,13 @@
 from typing import Dict, Any, List
-import logging
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from core.context import EngineContext
 from api.models.responses import PreprocessingResponse
 from src.shared.session import SessionManager
+from src.shared.logging_config import get_context_logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = get_context_logger(__name__)
 
 router = APIRouter()
 
@@ -34,6 +34,12 @@ async def preprocess_data(request: PreprocessingRequest):
     original_data = await session_manager.get_data(request.file_id)
     if original_data is None:
         raise HTTPException(status_code=404, detail="File not found")
+
+    # Set file context for logging
+    logger.set_file_context(
+        file_id=request.file_id,
+        file_type=getattr(original_data, 'dtypes', {}).get('__file_type__', 'unknown')
+    )
 
     try:
         logger.info(f"Preprocessing data for file_id: {request.file_id}")
