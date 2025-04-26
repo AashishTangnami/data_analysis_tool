@@ -186,6 +186,11 @@ class PandasIngestion(DataIngestionBase):
             # Check for presence of null values
             has_nulls = col_series.isna().any()
             
+            """
+            This optimization can be migrated to preprocessing step after ingestion.
+            This will save optimization time during ingestion.
+            
+            """
             # For integers
             if np.issubdtype(col_series.dtype, np.integer):
                 if has_nulls:

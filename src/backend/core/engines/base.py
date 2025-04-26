@@ -91,6 +91,21 @@ class EngineBase(ABC):
             return 'json'
         else:
             raise ValueError(f"Unsupported file type: {extension}")
+
+    @abstractmethod
+    def apply_single_operation(self, data: Any, operation: Dict[str, Any]) -> Any:
+        """
+        Apply a single preprocessing operation to data.
+        
+        Args:
+            data: Data in the engine's native format
+            operation: Single preprocessing operation to apply
+            
+        Returns:
+            Processed data in the engine's native format
+        """
+        pass
+
     # to pandas to dataframe.ls
     @abstractmethod
     def to_pandas(self, data: Any) -> Any:

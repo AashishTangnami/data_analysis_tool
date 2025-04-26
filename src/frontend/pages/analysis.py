@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import requests
 import json
+import time
+import threading
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
@@ -58,6 +60,9 @@ def render_descriptive_analysis_options():
     # Add analyze button
     if st.button("Run Descriptive Analysis"):
         run_analysis("descriptive", params)
+
+# Removed unused _validate_params method
+
 
 def render_preprocessing_options():
     """Render options for data preprocessing."""
@@ -354,6 +359,42 @@ def run_preprocessing(operations):
     Args:
         operations: List of preprocessing operations to apply
     """
+    # Create a progress bar
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
+    # Start a background thread for processing
+    def processing_thread():
+        for i, operation in enumerate(operations):
+            status_text.text(f"Processing operation: {operation['type']}")
+            # Update progress
+            progress = int((i / len(operations)) * 100)
+            progress_bar.progress(progress)
+            time.sleep(0.1)  # Simulate processing time
+
+        # Final API call to process all operations
+        result = frontend_context.preprocess_data(operations)
+
+        # Update session state with results
+        st.session_state.preprocessed = True
+        st.session_state.use_preprocessed = True
+        st.session_state.preprocessing_summary = result
+
+        # Complete progress
+        progress_bar.progress(100)
+        status_text.text("Preprocessing completed!")
+        time.sleep(1)  # Show completion briefly
+
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+
+        # Trigger rerun to refresh UI
+        st.rerun()
+
+    # Start thread
+    threading.Thread(target=processing_thread).start()
+
     try:
         # Get the frontend context from session state
         frontend_context = st.session_state.frontend_context
@@ -431,10 +472,12 @@ def render_diagnostic_analysis_options():
     numeric_cols = [col for col, dtype in st.session_state.data_summary.get("dtypes", {}).items()
                    if "float" in dtype.lower() or "int" in dtype.lower()]
 
-    # Select target column
+    # For feature importance and correlation analysis, we need numeric target columns
+    # Select target column (only numeric columns for diagnostic analysis)
     target_column = st.selectbox(
-        "Select target column",
-        options=columns
+        "Select target column (numeric only)",
+        options=numeric_cols,
+        help="Only numeric columns can be used for feature importance and correlation analysis"
     )
 
     # First, create the options list
@@ -475,16 +518,27 @@ def render_predictive_analysis_options():
     numeric_cols = [col for col, dtype in st.session_state.data_summary.get("dtypes", {}).items()
                    if "float" in dtype.lower() or "int" in dtype.lower()]
 
-    # Select target column
-    target_column = st.selectbox(
-        "Select target column to predict",
-        options=columns
-    )
-
-    # Determine if classification or regression
+    # For predictive models, we need numeric target columns for regression
+    # For classification, categorical columns are also acceptable
     problem_type = st.radio(
         "Problem type",
         options=["Regression", "Classification"]
+    )
+
+    if problem_type == "Regression":
+        # For regression, only numeric columns can be targets
+        target_options = numeric_cols
+        target_help = "For regression problems, only numeric columns can be predicted"
+    else:
+        # For classification, any column can be a target
+        target_options = columns
+        target_help = "For classification problems, any column can be predicted"
+
+    # Select target column
+    target_column = st.selectbox(
+        "Select target column to predict",
+        options=target_options,
+        help=target_help
     )
 
     # Select feature columns

@@ -1,13 +1,3 @@
-"""
-Logging middleware for FastAPI.
-
-This middleware automatically logs API requests with:
-- Request method and endpoint
-- Response status code
-- Request duration
-- Correlation ID for request tracking
-"""
-
 import time
 import uuid
 from fastapi import Request, Response

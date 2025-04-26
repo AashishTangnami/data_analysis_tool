@@ -1,120 +1,455 @@
 import streamlit as st
 import pandas as pd
-import requests
-import json
 from src.shared.logging_config import get_context_logger
 
 # Get logger for this module
 logger = get_context_logger(__name__)
 
+# Removed commented-out code for better maintainability
 def render_preprocessing_interface():
-    """Render the preprocessing interface with available operations."""
+    """Render the preprocessing interface with step-by-step operations."""
     st.subheader("Preprocessing Operations")
 
     # Get the frontend context from session state
     frontend_context = st.session_state.frontend_context
 
-    # Get available operations for the current engine
     try:
         # Use the frontend context to get available operations
-        operations = frontend_context.get_available_preprocessing_operations()
+        # We don't use the operations directly, but this validates the API connection
+        frontend_context.get_available_preprocessing_operations()
 
-        # Create an expandable section for each operation type
-        for op_name, op_details in operations.items():
-                with st.expander(f"{op_name.replace('_', ' ').title()} - {op_details['description']}"):
-                    # Display parameter inputs based on operation type
-                    params = {}
+        # Create tabs for different operation categories
+        preprocessing_tabs = st.tabs([
+            "Missing Values",
+            "Feature Selection",
+            "Encoding",
+            "Scaling",
+            "Feature Engineering"
+        ])
 
-                    for param_name, param_desc in op_details.get("params", {}).items():
-                        if "columns" in param_name:
-                            # Multi-select for columns
-                            all_columns = st.session_state.data_summary.get("columns", [])
-                            col_dtypes = st.session_state.data_summary.get("dtypes", {})
+        # Tab 1: Missing Values
+        with preprocessing_tabs[0]:
+            st.write("**Handle Missing Values**")
 
-                            # Infer simplified column types based on dtypes
-                            column_types = {}
-                            for col, dtype in col_dtypes.items():
-                                if "int" in dtype or "float" in dtype:
-                                    column_types[col] = "numeric"
-                                elif "object" in dtype or "category" in dtype:
-                                    column_types[col] = "categorical"
-                                elif "datetime" in dtype:
-                                    column_types[col] = "datetime"
-                                else:
-                                    column_types[col] = "other"
+            missing_strategy = st.radio(
+                "Missing Values Strategy",
+                ["Fill Missing Values", "Drop Rows with Missing Values"]
+            )
 
-                            # Showcase categorical columns only for encoding operations
-                            if "encode" in op_name.lower():
-                                all_columns = [
-                                    col for col in all_columns if column_types.get(col) == "categorical"
-                                ]
+            if missing_strategy == "Fill Missing Values":
+                # Fill missing values parameters
+                columns = st.multiselect(
+                    "Select columns to fill",
+                    options=["all"] + st.session_state.data_summary.get("columns", []),
+                    default=["all"]
+                )
 
-                            params[param_name] = st.multiselect(
-                                f"{param_name.replace('_', ' ').title()}: {param_desc}",
-                                options=["all"] + all_columns,
-                                default=["all"] if "all" in param_desc else []
-                            )
+                method = st.selectbox(
+                    "Fill method",
+                    options=["mean", "median", "mode", "constant"]
+                )
 
-                        elif "method" in param_name:
-                            # Select for method options
-                            method_options = []
-                            if "mean" in param_desc:
-                                method_options.extend(["mean", "median", "mode", "constant"])
-                            elif "one_hot" in param_desc:
-                                method_options.extend(["one_hot", "label", "ordinal"])
-                            elif "standard" in param_desc:
-                                method_options.extend(["standard", "minmax", "robust"])
-                            elif "log" in param_desc:
-                                method_options.extend(["log", "sqrt", "square", "absolute"])
+                value = None
+                if method == "constant":
+                    value = st.text_input("Constant value", "0")
 
-                            params[param_name] = st.selectbox(
-                                f"{param_name.replace('_', ' ').title()}: {param_desc}",
-                                options=method_options
-                            )
-
-                        elif "value" in param_name:
-                            # Text input for value
-                            params[param_name] = st.text_input(
-                                f"{param_name.replace('_', ' ').title()}: {param_desc}",
-                                value="0"
-                            )
-
-                        elif "how" in param_name:
-                            # Select for how options
-                            params[param_name] = st.selectbox(
-                                f"{param_name.replace('_', ' ').title()}: {param_desc}",
-                                options=["any", "all"]
-                            )
-
-                        else:
-                            # Default text input
-                            params[param_name] = st.text_input(
-                                f"{param_name.replace('_', ' ').title()}: {param_desc}"
-                            )
-
-                    # Add button to apply this operation
-                    if st.button(f"Apply {op_name.replace('_', ' ').title()}", key=f"btn_{op_name}"):
-                        # Create operation dictionary
-                        operation = {
-                            "type": op_name,
-                            "params": params
+                if st.button("Preview Fill Effect"):
+                    operation = {
+                        "type": "fill_missing",
+                        "params": {
+                            "columns": columns,
+                            "method": method,
+                            "value": value
                         }
+                    }
 
-                        # Add to operations list in session state
-                        if "preprocessing_operations" not in st.session_state:
-                            st.session_state.preprocessing_operations = []
+                    try:
+                        # Get preview of operation effect
+                        preview = frontend_context.preview_operation(operation)
 
-                        st.session_state.preprocessing_operations.append(operation)
-                        st.success(f"{op_name.replace('_', ' ').title()} operation added!")
+                        # Show preview
+                        st.write("**Preview of effect:**")
+                        st.dataframe(pd.DataFrame(preview["preview"]))
 
-        else:
-            st.error(f"Error loading operations: {response.json().get('detail', 'Unknown error')}")
+                        # Show impact metrics
+                        st.write("**Impact:**")
+                        st.write(f"- Missing values before: {preview['impact']['missing_values_before']}")
+                        st.write(f"- Missing values after: {preview['impact']['missing_values_after']}")
+
+                        # Add button to apply
+                        if st.button("Apply Fill Operation"):
+                            # Apply the operation and ignore the result since we'll rerun the page
+                            frontend_context.apply_single_operation(operation)
+                            st.success("Fill operation applied successfully!")
+                            st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Preview failed: {str(e)}")
+
+            else:
+                # Drop missing values parameters
+                how = st.radio(
+                    "How to drop",
+                    ["any", "all"],
+                    help="'any': Drop rows where any value is missing. 'all': Drop rows where all values are missing."
+                )
+
+                if st.button("Preview Drop Effect"):
+                    operation = {
+                        "type": "drop_missing",
+                        "params": {
+                            "how": how
+                        }
+                    }
+
+                    try:
+                        # Get preview of operation effect
+                        preview = frontend_context.preview_operation(operation)
+
+                        # Show preview
+                        st.write("**Preview of effect:**")
+                        st.dataframe(pd.DataFrame(preview["preview"]))
+
+                        # Show impact metrics
+                        st.write("**Impact:**")
+                        st.write(f"- Rows before: {preview['impact']['rows_before']}")
+                        st.write(f"- Rows after: {preview['impact']['rows_after']}")
+                        st.write(f"- Missing values before: {preview['impact']['missing_values_before']}")
+                        st.write(f"- Missing values after: {preview['impact']['missing_values_after']}")
+
+                        # Add button to apply
+                        if st.button("Apply Drop Operation"):
+                            # Apply the operation and ignore the result since we'll rerun the page
+                            frontend_context.apply_single_operation(operation)
+                            st.success("Drop operation applied successfully!")
+                            st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Preview failed: {str(e)}")
+
+        # Tab 2: Feature Selection
+        with preprocessing_tabs[1]:
+            st.write("**Feature Selection**")
+
+            # Drop columns
+            columns = st.multiselect(
+                "Select columns to drop",
+                options=st.session_state.data_summary.get("columns", [])
+            )
+
+            if st.button("Preview Drop Columns Effect"):
+                operation = {
+                    "type": "drop_columns",
+                    "params": {
+                        "columns": columns
+                    }
+                }
+
+                try:
+                    # Get preview of operation effect
+                    preview = frontend_context.preview_operation(operation)
+
+                    # Show preview
+                    st.write("**Preview of effect:**")
+                    st.dataframe(pd.DataFrame(preview["preview"]))
+
+                    # Show impact metrics
+                    st.write("**Impact:**")
+                    st.write(f"- Columns before: {preview['impact']['columns_before']}")
+                    st.write(f"- Columns after: {preview['impact']['columns_after']}")
+
+                    # Add button to apply
+                    if st.button("Apply Drop Columns Operation"):
+                        # Apply the operation and ignore the result since we'll rerun the page
+                        frontend_context.apply_single_operation(operation)
+                        st.success("Columns dropped successfully!")
+                        st.rerun()
+
+                except Exception as e:
+                    st.error(f"Preview failed: {str(e)}")
+
+        # Tab 3: Encoding
+        with preprocessing_tabs[2]:
+            st.write("**Categorical Encoding**")
+
+            # Get categorical columns
+            col_dtypes = st.session_state.data_summary.get("dtypes", {})
+            categorical_cols = [
+                col for col, dtype in col_dtypes.items()
+                if "object" in dtype or "category" in dtype
+            ]
+
+            if not categorical_cols:
+                st.info("No categorical columns detected in the dataset.")
+            else:
+                method = st.selectbox(
+                    "Encoding method",
+                    options=["one_hot", "label", "ordinal", "count", "target", "leave_one_out", "catboost"],
+                    help="""
+                    one_hot: Convert to binary columns (one per category)
+                    label: Convert to integer labels
+                    ordinal: Convert to ordered integers
+                    count: Replace with frequency counts
+                    target: Replace with target mean (requires target column)
+                    leave_one_out: Target encoding excluding current row
+                    catboost: Robust target encoding with random permutation
+                    """
+                )
+
+                columns = st.multiselect(
+                    "Select categorical columns to encode",
+                    options=["all"] + categorical_cols,
+                    default=["all"]
+                )
+
+                # For target-based encoding methods
+                target_column = None
+                if method in ["target", "leave_one_out", "catboost"]:
+                    target_column = st.selectbox(
+                        "Select target column for encoding",
+                        options=st.session_state.data_summary.get("columns", [])
+                    )
+
+                if st.button("Preview Encoding Effect"):
+                    operation = {
+                        "type": "encode_categorical",
+                        "params": {
+                            "columns": columns,
+                            "method": method,
+                            "target_column": target_column
+                        }
+                    }
+
+                    try:
+                        # Get preview of operation effect
+                        preview = frontend_context.preview_operation(operation)
+
+                        # Show preview
+                        st.write("**Preview of effect:**")
+                        st.dataframe(pd.DataFrame(preview["preview"]))
+
+                        # Show impact metrics
+                        st.write("**Impact:**")
+                        st.write(f"- Columns before: {preview['impact']['columns_before']}")
+                        st.write(f"- Columns after: {preview['impact']['columns_after']}")
+
+                        # Add button to apply
+                        if st.button("Apply Encoding Operation"):
+                            # Apply the operation and ignore the result since we'll rerun the page
+                            frontend_context.apply_single_operation(operation)
+                            st.success("Encoding applied successfully!")
+                            st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Preview failed: {str(e)}")
+
+        # Tab 4: Scaling
+        with preprocessing_tabs[3]:
+            st.write("**Numeric Scaling**")
+
+            # Get numeric columns
+            col_dtypes = st.session_state.data_summary.get("dtypes", {})
+            numeric_cols = [
+                col for col, dtype in col_dtypes.items()
+                if "int" in dtype or "float" in dtype
+            ]
+
+            if not numeric_cols:
+                st.info("No numeric columns detected in the dataset.")
+            else:
+                method = st.selectbox(
+                    "Scaling method",
+                    options=["standard", "minmax", "robust"],
+                    help="""
+                    standard: Standardize to mean=0, std=1
+                    minmax: Scale to range [0, 1]
+                    robust: Scale using median and quartiles
+                    """
+                )
+
+                columns = st.multiselect(
+                    "Select numeric columns to scale",
+                    options=["all"] + numeric_cols,
+                    default=["all"]
+                )
+
+                if st.button("Preview Scaling Effect"):
+                    operation = {
+                        "type": "scale_numeric",
+                        "params": {
+                            "columns": columns,
+                            "method": method
+                        }
+                    }
+
+                    try:
+                        # Get preview of operation effect
+                        preview = frontend_context.preview_operation(operation)
+
+                        # Show preview
+                        st.write("**Preview of effect:**")
+                        st.dataframe(pd.DataFrame(preview["preview"]))
+
+                        # Show impact metrics
+                        st.write("**Impact:**")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write(f"**Before Scaling:**")
+                            for col in columns:
+                                if col != "all":
+                                    stats = preview["original_summary"].get("column_stats", {}).get(col, {})
+                                    st.write(f"- {col}: mean={stats.get('mean', 'N/A')}, std={stats.get('std', 'N/A')}")
+
+                        with col2:
+                            st.write(f"**After Scaling:**")
+                            for col in columns:
+                                if col != "all":
+                                    stats = preview["processed_summary"].get("column_stats", {}).get(col, {})
+                                    st.write(f"- {col}: mean={stats.get('mean', 'N/A')}, std={stats.get('std', 'N/A')}")
+
+                        # Add button to apply
+                        if st.button("Apply Scaling Operation"):
+                            # Apply the operation and ignore the result since we'll rerun the page
+                            frontend_context.apply_single_operation(operation)
+                            st.success("Scaling applied successfully!")
+                            st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Preview failed: {str(e)}")
+
+        # Tab 5: Feature Engineering
+        with preprocessing_tabs[4]:
+            st.write("**Feature Engineering**")
+            st.warning("This section is limited to basic function applications for safety reasons.")
+
+            function = st.selectbox(
+                "Function to apply",
+                options=["log", "sqrt", "square", "absolute"],
+                help="""
+                log: Natural logarithm (log(x+1) for negative values)
+                sqrt: Square root (of absolute value for negative inputs)
+                square: Square (x^2)
+                absolute: Absolute value (|x|)
+                """
+            )
+
+            # Get numeric columns
+            col_dtypes = st.session_state.data_summary.get("dtypes", {})
+            numeric_cols = [
+                col for col, dtype in col_dtypes.items()
+                if "int" in dtype or "float" in dtype
+            ]
+
+            if not numeric_cols:
+                st.info("No numeric columns detected for feature engineering.")
+            else:
+                columns = st.multiselect(
+                    "Select columns to transform",
+                    options=numeric_cols
+                )
+
+                if st.button("Preview Transformation Effect"):
+                    operation = {
+                        "type": "apply_function",
+                        "params": {
+                            "columns": columns,
+                            "function": function
+                        }
+                    }
+
+                    try:
+                        # Get preview of operation effect
+                        preview = frontend_context.preview_operation(operation)
+
+                        # Show preview
+                        st.write("**Preview of effect:**")
+                        st.dataframe(pd.DataFrame(preview["preview"]))
+
+                        # Show impact metrics for each column
+                        st.write("**Impact on columns:**")
+                        for col in columns:
+                            before_stats = preview["original_summary"].get("column_stats", {}).get(col, {})
+                            after_stats = preview["processed_summary"].get("column_stats", {}).get(col, {})
+
+                            st.write(f"**{col}:**")
+                            st.write(f"- Before: min={before_stats.get('min', 'N/A')}, max={before_stats.get('max', 'N/A')}")
+                            st.write(f"- After: min={after_stats.get('min', 'N/A')}, max={after_stats.get('max', 'N/A')}")
+
+                        # Add button to apply
+                        if st.button("Apply Transformation"):
+                            # Apply the operation and ignore the result since we'll rerun the page
+                            frontend_context.apply_single_operation(operation)
+                            st.success("Transformation applied successfully!")
+                            st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Preview failed: {str(e)}")
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 
+
+def add_undo_redo_functionality():
+    # Store operation history in session state
+    if "operation_history" not in st.session_state:
+        st.session_state.operation_history = []
+        st.session_state.history_position = -1
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("↩️ Undo") and st.session_state.history_position > 0:
+            # Move back in history
+            st.session_state.history_position -= 1
+            # Apply operations up to this point
+            operations = st.session_state.operation_history[:st.session_state.history_position]
+            # Get the frontend context from session state
+            frontend_context = st.session_state.frontend_context
+            frontend_context.preprocess_data(operations)
+            st.rerun()
+
+    with col2:
+        if st.button("↪️ Redo") and st.session_state.history_position < len(st.session_state.operation_history) - 1:
+            # Move forward in history
+            st.session_state.history_position += 1
+            # Apply operations up to this point
+            operations = st.session_state.operation_history[:st.session_state.history_position + 1]
+            # Get the frontend context from session state
+            frontend_context = st.session_state.frontend_context
+            frontend_context.preprocess_data(operations)
+            st.rerun()
+
 def render_operations_summary():
     """Render a summary of the operations to be applied."""
+
+    def render_operations_order_control():
+        st.subheader("Operation Order")
+        st.write("Drag operations to reorder them:")
+
+        if "preprocessing_operations" not in st.session_state:
+            return
+
+        operations = st.session_state.preprocessing_operations
+
+        # Create sortable list
+        for i, op in enumerate(operations):
+            col1, col2, col3 = st.columns([0.1, 0.8, 0.1])
+
+            with col1:
+                # Up arrow
+                if st.button("⬆️", key=f"up_{i}") and i > 0:
+                    operations[i], operations[i-1] = operations[i-1], operations[i]
+                    st.rerun()
+
+            with col2:
+                st.write(f"{i+1}. **{op['type'].replace('_', ' ').title()}**")
+
+            with col3:
+                # Down arrow
+                if st.button("⬇️", key=f"down_{i}") and i < len(operations) - 1:
+                    operations[i], operations[i+1] = operations[i+1], operations[i]
+                    st.rerun()
+    render_operations_order_control()
     if "preprocessing_operations" in st.session_state and st.session_state.preprocessing_operations:
         st.subheader("Operations to Apply")
 
@@ -198,8 +533,11 @@ def render_preprocessing_results():
             st.session_state.page = "Analysis"
             st.rerun()
 
+# Removed commented-out code for better maintainability
+
+
 def render_preprocessing_page():
-    """Render the complete preprocessing page."""
+    """Render the complete preprocessing page with step-by-step operations."""
     st.title("Data Preprocessing")
 
     engine_type = st.session_state.file_id.split("_")[0]
@@ -213,24 +551,57 @@ def render_preprocessing_page():
 
     logger.info(f"Rendering preprocessing page for file: {st.session_state.file_id}")
 
-    st.write(f"**Current Engine:** {engine_type}")
-
     # Display current data info
-    st.write(f"**Current Engine:** {st.session_state.engine_type}")
+    st.write(f"**Current Engine:** {engine_type}")
     st.write(f"**File:** {file_name}")
 
-    # Create columns for original data preview
-    st.subheader("Original Data Preview")
-    st.dataframe(pd.DataFrame(st.session_state.data_preview))
+    # Create tabs for data preview and operations
+    main_tabs = st.tabs(["Data Preview", "Preprocessing Operations", "Operation History"])
 
-    # Create two columns for operations and summary
-    col1, col2 = st.columns([0.6, 0.4])
+    with main_tabs[0]:
+        # Display current data preview
+        st.subheader("Current Data Preview")
+        st.dataframe(pd.DataFrame(st.session_state.data_preview))
 
-    with col1:
+        # Display data summary
+        with st.expander("Data Summary"):
+            st.json(st.session_state.data_summary)
+
+    with main_tabs[1]:
+        # Render preprocessing interface with operations
         render_preprocessing_interface()
 
-    with col2:
-        render_operations_summary()
+    with main_tabs[2]:
+        # Render operation history with undo/redo functionality
+        st.subheader("Operation History")
 
-    # Render preprocessing results if applied
-    render_preprocessing_results()
+        if "preprocessing_operations" in st.session_state and st.session_state.preprocessing_operations:
+            operations = st.session_state.preprocessing_operations
+
+            # Display operations in a table
+            for i, op in enumerate(operations):
+                op_type = op["type"].replace("_", " ").title()
+                params = op.get("params", {})
+
+                # Create an expander for each operation
+                with st.expander(f"{i+1}. {op_type}", expanded=i==0):
+                    # Display parameters
+                    for param_name, param_value in params.items():
+                        if isinstance(param_value, list):
+                            st.write(f"**{param_name.replace('_', ' ').title()}**: {', '.join(str(x) for x in param_value)}")
+                        else:
+                            st.write(f"**{param_name.replace('_', ' ').title()}**: {param_value}")
+
+            # Add undo button
+            if st.button("Undo Last Operation"):
+                if operations:
+                    operations.pop()
+                    st.success("Last operation removed")
+                    st.rerun()
+        else:
+            st.info("No preprocessing operations have been applied yet.")
+
+    # Add button to proceed to analysis
+    if st.button("Proceed to Analysis"):
+        st.session_state.page = "Analysis"
+        st.rerun()
