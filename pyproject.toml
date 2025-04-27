@@ -45,6 +45,7 @@ dependencies = [
      "aiofiles>=24.1.0",
      "pyarrow>=19.0.1",
      "colorama>=0.4.6",
+     "pyspark>=3.5.5",
 ]
 
 [project.optional-dependencies]

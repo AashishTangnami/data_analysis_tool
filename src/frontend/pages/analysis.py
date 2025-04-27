@@ -59,6 +59,7 @@ def render_descriptive_analysis_options():
 
     # Add analyze button
     if st.button("Run Descriptive Analysis"):
+        logger.info(f"Starting descriptive analysis with params: {params}")
         run_analysis("descriptive", params)
 
 # Removed unused _validate_params method

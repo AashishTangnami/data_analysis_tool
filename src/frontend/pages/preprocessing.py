@@ -79,7 +79,7 @@ def render_preprocessing_interface():
                         # Add button to apply
                         if st.button("Apply Fill Operation"):
                             # Apply the operation and ignore the result since we'll rerun the page
-                            frontend_context.apply_single_operation(operation)
+                            frontend_context.apply_single_operation(st.session_state.file_id, operation)
                             st.success("Fill operation applied successfully!")
                             st.rerun()
 
@@ -120,7 +120,7 @@ def render_preprocessing_interface():
                         # Add button to apply
                         if st.button("Apply Drop Operation"):
                             # Apply the operation and ignore the result since we'll rerun the page
-                            frontend_context.apply_single_operation(operation)
+                            frontend_context.apply_single_operation(st.session_state.file_id, operation)
                             st.success("Drop operation applied successfully!")
                             st.rerun()
 
@@ -161,7 +161,7 @@ def render_preprocessing_interface():
                     # Add button to apply
                     if st.button("Apply Drop Columns Operation"):
                         # Apply the operation and ignore the result since we'll rerun the page
-                        frontend_context.apply_single_operation(operation)
+                        frontend_context.apply_single_operation(st.session_state.file_id, operation)
                         st.success("Columns dropped successfully!")
                         st.rerun()
 
@@ -222,7 +222,7 @@ def render_preprocessing_interface():
 
                     try:
                         # Get preview of operation effect
-                        preview = frontend_context.preview_operation(operation)
+                        preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
                         # Show preview
                         st.write("**Preview of effect:**")
@@ -236,7 +236,7 @@ def render_preprocessing_interface():
                         # Add button to apply
                         if st.button("Apply Encoding Operation"):
                             # Apply the operation and ignore the result since we'll rerun the page
-                            frontend_context.apply_single_operation(operation)
+                            frontend_context.apply_single_operation(st.session_state.file_id, operation)
                             st.success("Encoding applied successfully!")
                             st.rerun()
 
@@ -284,7 +284,7 @@ def render_preprocessing_interface():
 
                     try:
                         # Get preview of operation effect
-                        preview = frontend_context.preview_operation(operation)
+                        preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
                         # Show preview
                         st.write("**Preview of effect:**")
@@ -310,7 +310,7 @@ def render_preprocessing_interface():
                         # Add button to apply
                         if st.button("Apply Scaling Operation"):
                             # Apply the operation and ignore the result since we'll rerun the page
-                            frontend_context.apply_single_operation(operation)
+                            frontend_context.apply_single_operation(st.session_state.file_id, operation)
                             st.success("Scaling applied successfully!")
                             st.rerun()
 
@@ -359,7 +359,7 @@ def render_preprocessing_interface():
 
                     try:
                         # Get preview of operation effect
-                        preview = frontend_context.preview_operation(operation)
+                        preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
                         # Show preview
                         st.write("**Preview of effect:**")
@@ -378,7 +378,7 @@ def render_preprocessing_interface():
                         # Add button to apply
                         if st.button("Apply Transformation"):
                             # Apply the operation and ignore the result since we'll rerun the page
-                            frontend_context.apply_single_operation(operation)
+                            frontend_context.apply_single_operation(st.session_state.file_id, operation)
                             st.success("Transformation applied successfully!")
                             st.rerun()
 
