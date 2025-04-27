@@ -2,7 +2,10 @@ import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Optional, Union
 from core.preprocessing.base import PreprocessingBase
+from src.shared.logging_config import get_context_logger
 
+# Configure logging
+logger = get_context_logger(__name__)
 class PandasPreprocessing(PreprocessingBase):
     """
     Pandas implementation of preprocessing strategy.
@@ -27,23 +30,32 @@ class PandasPreprocessing(PreprocessingBase):
         
         # Apply each operation in sequence
         for operation in operations:
+
             op_type = operation.get("type")
             params = operation.get("params", {})
+            logger.info(f"Applying operation: {op_type} with params: {params}")
             
-            if op_type == "drop_columns":
-                result = self._drop_columns(result, **params)
-            elif op_type == "fill_missing":
-                result = self._fill_missing(result, **params)
-            elif op_type == "drop_missing":
-                result = self._drop_missing(result, **params)
-            elif op_type == "encode_categorical":
-                result = self._encode_categorical(result, **params)
-            elif op_type == "scale_numeric":
-                result = self._scale_numeric(result, **params)
-            elif op_type == "apply_function":
-                result = self._apply_function(result, **params)
-            else:
-                raise ValueError(f"Unsupported operation type: {op_type}")
+            try:
+                if op_type == "drop_columns":
+                    result = self._drop_columns(result, **params)
+                elif op_type == "fill_missing":
+                    result = self._fill_missing(result, **params)
+                elif op_type == "drop_missing":
+                    result = self._drop_missing(result, **params)
+                elif op_type == "encode_categorical":
+                    result = self._encode_categorical(result, **params)
+                elif op_type == "scale_numeric":
+                    result = self._scale_numeric(result, **params)
+                elif op_type == "apply_function":
+                    result = self._apply_function(result, **params)
+                else:
+                    logger.error(f"Unsupported operation type: {op_type}")
+                    raise ValueError(f"Unsupported operation type: {op_type}")
+                
+                logger.info(f"Operation {op_type} applied successfully")
+            except Exception as e:
+                logger.error(f"Error applying operation {op_type}: {str(e)}")
+                raise
         
         return result
     

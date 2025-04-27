@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field, field_validator
 from core.context import EngineContext
 from api.models.responses import AnalysisResponse
 from src.shared.constants import EngineType, AnalysisType
-from src.shared.session import SessionManager
 from src.shared.logging_config import get_context_logger
 
 # Configure logging
@@ -73,9 +72,20 @@ async def analyze_data(request: AnalysisRequest):
             raise HTTPException(status_code=404, detail=f"File not found with ID: {request.file_id}")
 
     # Set file context for logging
+    # Handle different data types safely
+    if hasattr(data, 'dtypes') and hasattr(data.dtypes, 'get'):
+        file_type = data.dtypes.get('__file_type__', 'unknown')
+    elif hasattr(data, 'schema') and isinstance(data.schema, dict):
+        file_type = data.schema.get('__file_type__', 'unknown')
+    elif isinstance(data, dict) and 'dtypes' in data:
+        file_type = data['dtypes'].get('__file_type__', 'unknown') if isinstance(data['dtypes'], dict) else 'unknown'
+    else:
+        # Default fallback
+        file_type = 'unknown'
+
     logger.set_file_context(
         file_id=request.file_id,
-        file_type=getattr(data, 'dtypes', {}).get('__file_type__', 'unknown')
+        file_type=file_type
     )
 
     # Set request context for logging
@@ -113,10 +123,18 @@ async def analyze_data(request: AnalysisRequest):
             message=f"{request.analysis_type.capitalize()} analysis completed successfully"
         )
 
-    except Exception as e:
-        logger.failure(f"Error analyzing data: {str(e)}")
-        logger.exception("Analysis failed with exception")
+    except ValueError as e:
+        # For expected errors like invalid parameters
+        logger.failure(f"Error analyzing data (validation error): {str(e)}")
+        logger.exception("Analysis failed with validation exception")
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # For unexpected errors
+        logger.failure(f"Error analyzing data (internal error): {str(e)}")
+        logger.exception("Analysis failed with exception")
+        # Return a more detailed error message for debugging
+        error_detail = f"Internal server error during analysis: {str(e)}"
+        raise HTTPException(status_code=500, detail=error_detail)
 
 def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
     """

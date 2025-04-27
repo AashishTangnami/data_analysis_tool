@@ -92,23 +92,24 @@ class PandasIngestion(DataIngestionBase):
             return pd.read_csv(file_path, **kwargs)
         
         # For large files, use chunking with PyArrow
-        chunks = []
-        for chunk in pd.read_csv(file_path, chunksize=chunk_size, engine='pyarrow', **kwargs):
-            if not chunks:  # First chunk
-                dtypes = self._infer_optimal_dtypes(chunk)
-            else:
-                # Apply optimal dtypes to subsequent chunks
-                for col, dtype in dtypes.items():
-                    if col in chunk.columns:
-                        try:
-                            chunk[col] = chunk[col].astype(dtype)
-                        except (ValueError, TypeError):
-                            pass
-            chunks.append(chunk)
+
+        # chunks = []
+        # for chunk in pd.read_csv(file_path, chunksize=chunk_size, engine='pyarrow', **kwargs):
+        #     if not chunks:  # First chunk
+        #         dtypes = self._infer_optimal_dtypes(chunk)
+        #     else:
+        #         # Apply optimal dtypes to subsequent chunks
+        #         for col, dtype in dtypes.items():
+        #             if col in chunk.columns:
+        #                 try:
+        #                     chunk[col] = chunk[col].astype(dtype)
+        #                 except (ValueError, TypeError):
+        #                     pass
+        #     chunks.append(chunk)
                 
-        result = pd.concat(chunks, ignore_index=True)
-        chunks.clear()
-        return result
+        # result = pd.concat(chunks, ignore_index=True)
+        # chunks.clear()
+        # return result
     
     def _load_excel(self, file_path: str, **kwargs) -> pd.DataFrame:
         """Load Excel file with appropriate optimizations."""

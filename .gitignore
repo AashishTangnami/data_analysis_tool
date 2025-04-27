@@ -74,6 +74,9 @@ src/backend/core/preprocessing/utils
 src/frontend/pages/structural_issues
 src/backend/core/preprocessing/column_mapper.py
 
+#
+technical_documentation.md
+
 # ignore all the __pycache__ in the codebase
 **/__pycache__
 **/**/__pycache__ 
