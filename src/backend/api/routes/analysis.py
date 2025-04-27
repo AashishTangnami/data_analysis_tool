@@ -72,9 +72,20 @@ async def analyze_data(request: AnalysisRequest):
             raise HTTPException(status_code=404, detail=f"File not found with ID: {request.file_id}")
 
     # Set file context for logging
+    # Handle different data types safely
+    if hasattr(data, 'dtypes') and hasattr(data.dtypes, 'get'):
+        file_type = data.dtypes.get('__file_type__', 'unknown')
+    elif hasattr(data, 'schema') and isinstance(data.schema, dict):
+        file_type = data.schema.get('__file_type__', 'unknown')
+    elif isinstance(data, dict) and 'dtypes' in data:
+        file_type = data['dtypes'].get('__file_type__', 'unknown') if isinstance(data['dtypes'], dict) else 'unknown'
+    else:
+        # Default fallback
+        file_type = 'unknown'
+
     logger.set_file_context(
         file_id=request.file_id,
-        file_type=getattr(data, 'dtypes', {}).get('__file_type__', 'unknown')
+        file_type=file_type
     )
 
     # Set request context for logging
