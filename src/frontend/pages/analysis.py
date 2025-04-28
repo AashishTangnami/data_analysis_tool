@@ -643,42 +643,58 @@ def run_analysis(analysis_type, params):
         analysis_type: Type of analysis to run
         params: Parameters for the analysis
     """
+    # Check if an analysis is already running
+    if "analysis_running" in st.session_state and st.session_state.analysis_running:
+        st.warning("An analysis is already in progress. Please wait for it to complete.")
+        return
+
+    # Set the analysis_running flag
+    st.session_state.analysis_running = True
+    st.session_state.current_analysis_type = analysis_type
+
     try:
-        # Get the frontend context from session state
-        frontend_context = st.session_state.frontend_context
+        # Show a spinner while the analysis is running
+        with st.spinner(f"Running {analysis_type.capitalize()} analysis..."):
+            # Get the frontend context from session state
+            frontend_context = st.session_state.frontend_context
 
-        # Determine whether to use preprocessed data
-        use_preprocessed = "use_preprocessed" in st.session_state and st.session_state.use_preprocessed
+            # Determine whether to use preprocessed data
+            use_preprocessed = "use_preprocessed" in st.session_state and st.session_state.use_preprocessed
 
-        # Set file context for logging
-        if "file_id" in st.session_state:
-            logger.set_file_context(
-                file_id=st.session_state.file_id,
-                file_name=st.session_state.file_id.split('_', 1)[1] if '_' in st.session_state.file_id else st.session_state.file_id
+            # Set file context for logging
+            if "file_id" in st.session_state:
+                logger.set_file_context(
+                    file_id=st.session_state.file_id,
+                    file_name=st.session_state.file_id.split('_', 1)[1] if '_' in st.session_state.file_id else st.session_state.file_id
+                )
+
+            # Set request context for logging
+            logger.set_request_context(
+                method="POST",
+                endpoint=f"/api/analysis/analyze"
             )
 
-        # Set request context for logging
-        logger.set_request_context(
-            method="POST",
-            endpoint=f"/api/analysis/analyze"
-        )
+            # Log analysis start
+            logger.info(f"Starting {analysis_type} analysis with params: {params}, use_preprocessed={use_preprocessed}")
 
-        # Log analysis start
-        logger.info(f"Starting {analysis_type} analysis with params: {params}, use_preprocessed={use_preprocessed}")
+            # Use the frontend context to run the analysis
+            result = frontend_context.analyze_data(
+                analysis_type=analysis_type,
+                params=params,
+                use_preprocessed=use_preprocessed
+            )
 
-        # Use the frontend context to run the analysis
-        result = frontend_context.analyze_data(
-            analysis_type=analysis_type,
-            params=params,
-            use_preprocessed=use_preprocessed
-        )
+            # Log success
+            logger.success(f"{analysis_type.capitalize()} analysis completed successfully")
 
-        # Log success
-        logger.success(f"{analysis_type.capitalize()} analysis completed successfully")
+            # Success message
+            st.success(f"{analysis_type.capitalize()} analysis completed successfully!")
 
-        # Success message and refresh
-        st.success(f"{analysis_type.capitalize()} analysis completed successfully!")
-        st.rerun()
+            # Reset the analysis_running flag
+            st.session_state.analysis_running = False
+
+            # Refresh the page to show results
+            st.rerun()
 
     except Exception as e:
         # Log failure with context
@@ -687,6 +703,9 @@ def run_analysis(analysis_type, params):
 
         # Show error to user
         st.error(f"An error occurred: {str(e)}")
+
+        # Reset the analysis_running flag
+        st.session_state.analysis_running = False
 
 def render_analysis_results():
     """Render analysis results and visualizations."""
@@ -886,14 +905,32 @@ def render_analysis_page():
 
     logger.info(f"Rendering analysis page for file: {st.session_state.file_id}")
 
-    # Display current data info
-    st.write(f"**Current Engine:** {st.session_state.engine_type}")
-    st.write(f"**File:** {file_name}")
+    # Create a layout with two columns for info and status
+    col1, col2 = st.columns([3, 1])
 
-    if "use_preprocessed" in st.session_state and st.session_state.use_preprocessed:
-        st.write("**Using:** Preprocessed Data")
-    else:
-        st.write("**Using:** Original Data")
+    with col1:
+        # Display current data info
+        st.write(f"**Current Engine:** {st.session_state.engine_type}")
+        st.write(f"**File:** {file_name}")
+
+        if "use_preprocessed" in st.session_state and st.session_state.use_preprocessed:
+            st.write("**Using:** Preprocessed Data")
+        else:
+            st.write("**Using:** Original Data")
+
+    with col2:
+        # Display analysis status
+        if "analysis_running" in st.session_state and st.session_state.analysis_running:
+            analysis_type = st.session_state.current_analysis_type.capitalize()
+            st.warning(f"⏳ {analysis_type} Analysis Running")
+
+            # Add a stop button
+            if st.button("Stop Analysis", type="primary"):
+                st.session_state.analysis_running = False
+                st.info("Analysis stopped by user.")
+                st.rerun()
+        else:
+            st.success("Ready for Analysis")
 
     # Add toggle for preprocessed data if available
     if "preprocessed" in st.session_state and st.session_state.preprocessed:

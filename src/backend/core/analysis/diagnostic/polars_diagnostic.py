@@ -1,4 +1,7 @@
 import polars as pl
+import pandas as pd
+import numpy as np
+from scipy import stats
 from typing import Dict, Any
 from core.analysis.diagnostic.base import DiagnosticAnalysisBase
 
@@ -48,7 +51,7 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
 
         # Initialize results
         results = {
-            "feature_importance": {},
+            # "feature_importance": {},  # Comment out to match pandas implementation
             "outlier_detection": {},
             "correlation_analysis": {}
         }
@@ -85,7 +88,7 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
 
                 # Make sure all data is numeric and handle any remaining NaN
                 for col in X.columns:
-                    X[col] = pd.to_numeric(X[col], errors='coerce')
+                    X[col] = pl.Series(X[col]).to_numeric(X[col], errors='coerce')
 
                 X = X.fillna(X.mean())
 
@@ -138,12 +141,21 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                             # Find outliers (|z| > 3)
                             outliers = selected_data.with_column(z_scores).filter(pl.abs(pl.col("z_score")) > 3)
 
+                            # Get outlier indices (convert to list for JSON serialization)
+                            # Limit to 20 indices like pandas implementation
+                            outlier_indices = []
+                            if outliers.height > 0:
+                                # Convert to pandas to get indices (simpler than tracking in polars)
+                                pd_outliers = outliers.to_pandas()
+                                outlier_indices = pd_outliers.index.tolist()[:20]
+
                             # Save results
                             outlier_results[col] = {
                                 "mean": float(mean),
                                 "std": float(std),
                                 "outlier_count": outliers.height,
-                                "outlier_percentage": outliers.height / selected_data.height * 100
+                                "outlier_percentage": outliers.height / selected_data.height * 100,
+                                "outlier_indices": outlier_indices
                             }
                 except Exception as e:
                     outlier_results[col] = {"error": str(e)}
@@ -163,8 +175,12 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                     if corr_df.height > 0:
                         corr = corr_df.item(0, 0)
 
-                        # p-value calculation would require scipy, so we'll use a placeholder
-                        p_value = 0.0  # Placeholder
+                        # Convert to pandas for p-value calculation
+                        pd_col = selected_data[col].to_pandas()
+                        pd_target = selected_data[target_column].to_pandas()
+
+                        # Calculate p-value
+                        _, p_value = stats.pearsonr(pd_col, pd_target)
 
                         corr_results[col] = {
                             "correlation": float(corr) if corr is not None else 0.0,

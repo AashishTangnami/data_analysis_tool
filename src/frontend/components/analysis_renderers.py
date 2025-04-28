@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
+import time
+import random
 
 from components.visualization import (
     render_distribution_plot,
@@ -12,6 +14,13 @@ from components.visualization import (
     render_scatter_plot,
     render_categorical_plot
 )
+
+# Function to generate truly unique keys for Streamlit elements
+def generate_unique_key(prefix):
+    """Generate a truly unique key for Streamlit elements to avoid duplicate ID errors."""
+    timestamp = int(time.time() * 1000)
+    random_component = random.randint(0, 1000000)
+    return f"{prefix}_{timestamp}_{random_component}"
 
 def render_diagnostic_results(results=None):
     """
@@ -90,7 +99,7 @@ def render_feature_importance(results):
         coloraxis_showscale=False
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("feature_importance"))
 
     # Feature importance insights
     st.subheader("Insights")
@@ -182,7 +191,7 @@ def render_correlation_analysis(results):
     # Add a vertical line at x=0
     fig.add_vline(x=0, line_width=1, line_dash="dash", line_color="gray")
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key=generate_unique_key("correlation_chart"))
 
     # Correlation analysis insights
     st.subheader("Insights")
@@ -316,7 +325,9 @@ def render_outlier_detection(results):
                     margin=dict(l=20, r=20, t=30, b=20),
                 )
 
-                st.plotly_chart(fig, use_container_width=True)
+                # Use our function to generate a truly unique key
+                unique_key = generate_unique_key(f"outlier_gauge_{feature}_{idx}")
+                st.plotly_chart(fig, use_container_width=True, key=unique_key)
 
     # Outlier detection summary table
     st.subheader("Outlier Detection Summary")
