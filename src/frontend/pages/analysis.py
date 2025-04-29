@@ -1,31 +1,18 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import time
 import threading
-import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.express as px
-import plotly.graph_objects as go
 from src.shared.logging_config import get_context_logger
 
 # Get logger for this module
 logger = get_context_logger(__name__)
 
-from components.visualization import (
-    render_distribution_plot,
-    render_correlation_heatmap,
-    render_scatter_plot,
-    render_categorical_plot
-)
-
 # Import the analysis renderers
 from components.analysis_renderers import (
     render_diagnostic_results,
-    # render_feature_importance,
-    # render_correlation_analysis,
-    # render_outlier_detection,
-    # create_tabs_for_results
+    render_descriptive_results,
+    render_predictive_results,
+    render_prescriptive_results
 )
 
 def render_descriptive_analysis_options():
@@ -452,7 +439,7 @@ def fetch_data_preview(use_preprocessed=False):
         frontend_context = st.session_state.frontend_context
 
         # Use the frontend context to get data preview
-        result = frontend_context.get_data_preview(use_preprocessed)
+        frontend_context.get_data_preview(use_preprocessed)
 
         # Success message and refresh
         st.success(f"Data preview updated to {'preprocessed' if use_preprocessed else 'original'} data.")
@@ -573,8 +560,7 @@ def render_prescriptive_analysis_options():
     """Render options for prescriptive analysis."""
     st.subheader("Prescriptive Analysis Options")
 
-    # Get columns from data summary
-    columns = st.session_state.data_summary.get("columns", [])
+    # Get numeric columns from data summary
     numeric_cols = [col for col, dtype in st.session_state.data_summary.get("dtypes", {}).items()
                    if "float" in dtype.lower() or "int" in dtype.lower()]
 
@@ -676,7 +662,7 @@ def run_analysis(analysis_type, params):
             logger.info(f"Starting {analysis_type} analysis with params: {params}, use_preprocessed={use_preprocessed}")
 
             # Use the frontend context to run the analysis
-            result = frontend_context.analyze_data(
+            frontend_context.analyze_data(
                 analysis_type=analysis_type,
                 params=params,
                 use_preprocessed=use_preprocessed
@@ -710,185 +696,17 @@ def render_analysis_results():
     if "analysis_completed" in st.session_state and st.session_state.analysis_completed:
         st.subheader("Analysis Results")
 
-        # Display different results based on analysis type
+        # Display different results based on analysis type using the imported renderers
         if st.session_state.analysis_type == "descriptive":
             render_descriptive_results()
         elif st.session_state.analysis_type == "diagnostic":
-            # Use the imported render_diagnostic_results function
             render_diagnostic_results()
         elif st.session_state.analysis_type == "predictive":
             render_predictive_results()
         elif st.session_state.analysis_type == "prescriptive":
             render_prescriptive_results()
 
-def render_descriptive_results():
-    """Render descriptive analysis results."""
-    results = st.session_state.analysis_results
-
-    # Create tabs for different result sections
-    tabs = []
-    tab_titles = []
-
-    if "numeric_analysis" in results and results["numeric_analysis"]:
-        tabs.append("numeric")
-        tab_titles.append("Numeric Analysis")
-
-    if "categorical_analysis" in results and results["categorical_analysis"]:
-        tabs.append("categorical")
-        tab_titles.append("Categorical Analysis")
-
-    if "correlations" in results and results["correlations"]:
-        tabs.append("correlations")
-        tab_titles.append("Correlations")
-
-    # Create the tabs
-    if tabs:
-        selected_tabs = st.tabs(tab_titles)
-
-        for i, tab_type in enumerate(tabs):
-            with selected_tabs[i]:
-                if tab_type == "numeric":
-                    # Display numeric statistics
-                    if "statistics" in results["numeric_analysis"]:
-                        st.subheader("Descriptive Statistics")
-
-                        # Convert to DataFrame for display
-                        stats_dict = results["numeric_analysis"]["statistics"]
-                        stats_df = pd.DataFrame(stats_dict)
-
-                        # Display transpose for better readability
-                        st.dataframe(stats_df.T)
-
-                    # Display distributions
-                    st.subheader("Distributions")
-
-                    # Create a multi-select for columns to visualize
-                    if "statistics" in results["numeric_analysis"]:
-                        numeric_cols = list(results["numeric_analysis"]["statistics"].keys())
-                        selected_cols = st.multiselect(
-                            "Select columns to visualize",
-                            options=numeric_cols,
-                            default=numeric_cols[:3] if len(numeric_cols) > 3 else numeric_cols
-                        )
-
-                        # Create a DataFrame from preview data for visualization
-                        if "data_preview" in st.session_state:
-                            df_preview = pd.DataFrame(st.session_state.data_preview)
-
-                            for col in selected_cols:
-                                if col in df_preview.columns:
-                                    st.write(f"**Distribution of {col}**")
-                                    try:
-                                        render_distribution_plot(df_preview, col)
-                                    except Exception as e:
-                                        st.error(f"Could not render plot for {col}: {str(e)}")
-
-                elif tab_type == "categorical":
-                    # Display categorical analysis
-                    if "value_counts" in results["categorical_analysis"]:
-                        st.subheader("Value Counts")
-
-                        # Select a column to display
-                        categorical_cols = list(results["categorical_analysis"]["value_counts"].keys())
-
-                        if categorical_cols:
-                            selected_col = st.selectbox(
-                                "Select column to visualize",
-                                options=categorical_cols
-                            )
-
-                            # Display value counts
-                            counts = results["categorical_analysis"]["value_counts"][selected_col]
-                            counts_df = pd.DataFrame(
-                                {"Count": list(counts.values())},
-                                index=list(counts.keys())
-                            )
-
-                            st.dataframe(counts_df)
-
-                            # Create bar chart
-                            st.subheader(f"Distribution of {selected_col}")
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            counts_df.plot.bar(ax=ax)
-                            plt.tight_layout()
-                            st.pyplot(fig)
-
-                    # Display unique counts
-                    if "unique_counts" in results["categorical_analysis"]:
-                        st.subheader("Unique Value Counts")
-
-                        unique_counts = results["categorical_analysis"]["unique_counts"]
-                        unique_df = pd.DataFrame(
-                            {"Unique Values": list(unique_counts.values())},
-                            index=list(unique_counts.keys())
-                        )
-
-                        st.dataframe(unique_df)
-
-                elif tab_type == "correlations":
-                    # Display correlation matrix
-                    st.subheader("Correlation Matrix")
-
-                    # Create DataFrame from correlation dictionary
-                    corr_dict = results["correlations"]
-                    corr_df = pd.DataFrame(corr_dict)
-
-                    # Display the correlation matrix
-                    st.dataframe(corr_df)
-
-                    # Create heatmap visualization
-                    st.subheader("Correlation Heatmap")
-
-                    fig, ax = plt.subplots(figsize=(12, 10))
-                    sns.heatmap(corr_df, annot=True, cmap="coolwarm", fmt=".2f", ax=ax)
-                    plt.tight_layout()
-                    st.pyplot(fig)
-
-                    # Add scatter plot for highest correlations
-                    st.subheader("Scatter Plots for Highest Correlations")
-
-                    # Find highest correlations (excluding self-correlations)
-                    high_corrs = []
-                    for col1 in corr_df.columns:
-                        for col2 in corr_df.columns:
-                            if col1 != col2:
-                                corr_val = abs(corr_df.loc[col1, col2])
-                                high_corrs.append((col1, col2, corr_val))
-
-                    # Sort by correlation value
-                    high_corrs.sort(key=lambda x: x[2], reverse=True)
-
-                    # Display top correlations
-                    if high_corrs:
-                        top_n = min(3, len(high_corrs))
-
-                        for i in range(top_n):
-                            col1, col2, corr_val = high_corrs[i]
-                            st.write(f"**{col1} vs {col2}** (correlation: {corr_val:.2f})")
-
-                            # Create scatter plot
-                            if "data_preview" in st.session_state:
-                                df_preview = pd.DataFrame(st.session_state.data_preview)
-                                try:
-                                    render_scatter_plot(df_preview, col1, col2)
-                                except Exception as e:
-                                    st.error(f"Could not render scatter plot: {str(e)}")
-
-def render_predictive_results():
-    """Render predictive analysis results (placeholder)."""
-    st.info("Predictive analysis results rendering will be implemented in the next phase.")
-
-    # Display raw results in JSON format
-    with st.expander("Raw Results"):
-        st.json(st.session_state.analysis_results)
-
-def render_prescriptive_results():
-    """Render prescriptive analysis results (placeholder)."""
-    st.info("Prescriptive analysis results rendering will be implemented in the next phase.")
-
-    # Display raw results in JSON format
-    with st.expander("Raw Results"):
-        st.json(st.session_state.analysis_results)
+# Removed duplicate render functions - now using the centralized versions from analysis_renderers.py
 
 def render_analysis_page():
     """Render the complete analysis page."""

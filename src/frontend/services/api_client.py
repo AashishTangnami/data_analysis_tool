@@ -5,6 +5,8 @@ import requests
 import time
 from typing import Dict, Any, List, Optional
 from src.shared.logging_config import get_context_logger
+from src.frontend.utils.api_helpers import handle_api_response, make_api_request
+from src.frontend.utils.logging_helpers import log_file_operation, log_api_request, log_error
 
 # Get context logger for this module
 logger = get_context_logger(__name__)
@@ -34,62 +36,8 @@ class ApiClient:
         Raises:
             Exception: If response indicates an error
         """
-        # Add request info to context
-        context = {
-            'status_code': response.status_code,
-            'url': response.url,
-            'method': response.request.method,
-            'elapsed_ms': int(response.elapsed.total_seconds() * 1000)
-        }
-
-        # Add any additional request info
-        if request_info:
-            context.update(request_info)
-
-        try:
-            response.raise_for_status()
-            result = response.json()
-
-            # Log successful response with context
-            logger.add_context(**context).info(
-                f"API request successful: {response.request.method} {response.url} "
-                f"({response.status_code}) in {context['elapsed_ms']}ms"
-            )
-            logger.clear_context()
-
-            return result
-
-        except requests.exceptions.HTTPError as e:
-            # Try to get error details from response
-            try:
-                error_detail = response.json().get('detail', str(e)) if response.content else str(e)
-            except ValueError:
-                error_detail = response.text if response.content else str(e)
-
-            # Add error details to context
-            context.update({
-                'error_type': type(e).__name__,
-                'error_detail': error_detail
-            })
-
-            # Log error with context
-            logger.add_context(**context).error(f"{error_message}: {error_detail}")
-            logger.clear_context()
-
-            raise Exception(f"{error_message}: {error_detail}")
-
-        except Exception as e:
-            # Add error details to context
-            context.update({
-                'error_type': type(e).__name__,
-                'error_message': str(e)
-            })
-
-            # Log error with context
-            logger.add_context(**context).exception(f"{error_message}: {str(e)}")
-            logger.clear_context()
-
-            raise Exception(f"{error_message}: {str(e)}")
+        # Use the centralized utility function
+        return handle_api_response(response, error_message, request_info)
 
     # File Operations
     def upload_file(self, file, engine_type: str) -> Dict[str, Any]:
@@ -114,7 +62,7 @@ class ApiClient:
             files = {"file": file}
             data = {"engine_type": engine_type}
 
-            # Log the request
+            # Create file info for logging
             file_info = {
                 'file_name': file.name if hasattr(file, 'name') else 'unknown',
                 'file_type': file.type if hasattr(file, 'type') else 'unknown',
@@ -122,11 +70,8 @@ class ApiClient:
                 'engine_type': engine_type
             }
 
-            logger.add_context(**file_info).info(
-                f"Uploading file {file_info['file_name']} ({file_info['file_size']} bytes) "
-                f"with engine {engine_type}"
-            )
-            logger.clear_context()
+            # Log the file operation
+            log_file_operation("upload", file_info)
 
             # Make the request
             response = requests.post(
@@ -147,12 +92,10 @@ class ApiClient:
 
         except Exception as e:
             # Log error with context
-            logger.add_context(
-                file_name=file.name if hasattr(file, 'name') else 'unknown',
-                engine_type=engine_type,
-                error_type=type(e).__name__
-            ).exception(f"Error uploading file: {str(e)}")
-            logger.clear_context()
+            log_error("Error uploading file", e, {
+                'file_name': file.name if hasattr(file, 'name') else 'unknown',
+                'engine_type': engine_type
+            })
             raise
 
     def preview_operation(self, file_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
@@ -167,16 +110,20 @@ class ApiClient:
             Dict with preview information
         """
         try:
-            payload = {
-                "file_id": file_id,
-                "operation": operation
-            }
-
-            response = requests.post(f"{self.base_url}/preprocessing/preview_operation", json=payload)
-            return self._handle_response(response, "Operation preview failed")
-
+            # Use the centralized API request function
+            return make_api_request(
+                "post",
+                f"{self.base_url}/preprocessing/preview_operation",
+                json={
+                    "file_id": file_id,
+                    "operation": operation
+                }
+            )
         except Exception as e:
-            logger.error(f"Error previewing operation: {str(e)}")
+            log_error("Failed to preview operation", e, {
+                'file_id': file_id,
+                'operation_type': operation.get('type', 'unknown')
+            })
             raise Exception(f"Failed to preview operation: {str(e)}")
 
     def apply_single_operation(self, file_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
@@ -191,48 +138,53 @@ class ApiClient:
             Dict with operation result information
         """
         try:
-            payload = {
-                "file_id": file_id,
-                "operation": operation
-            }
-
-            response = requests.post(f"{self.base_url}/preprocessing/apply_operation", json=payload)
-            return self._handle_response(response, "Operation application failed")
-
+            # Use the centralized API request function
+            return make_api_request(
+                "post",
+                f"{self.base_url}/preprocessing/apply_operation",
+                json={
+                    "file_id": file_id,
+                    "operation": operation
+                }
+            )
         except Exception as e:
-            logger.error(f"Error applying operation: {str(e)}")
+            log_error("Failed to apply operation", e, {
+                'file_id': file_id,
+                'operation_type': operation.get('type', 'unknown')
+            })
             raise Exception(f"Failed to apply operation: {str(e)}")
 
     # Preprocessing Operations
     def get_preprocessing_operations(self, engine_type: str) -> Dict[str, Any]:
         """Get available preprocessing operations for the specified engine."""
         try:
-            response = requests.get(
+            # Use the centralized API request function
+            result = make_api_request(
+                "get",
                 f"{self.base_url}/preprocessing/operations/{engine_type}"
             )
-
-            result = self._handle_response(response, "Failed to get preprocessing operations")
             return result.get("operations", {})
         except Exception as e:
-            logger.error(f"Error getting preprocessing operations: {str(e)}")
+            log_error("Failed to get preprocessing operations", e, {'engine_type': engine_type})
             raise
 
     def preprocess_data(self, file_id: str, operations: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Apply preprocessing operations to data."""
         try:
-            payload = {
-                "file_id": file_id,
-                "operations": operations
-            }
-
-            response = requests.post(
+            # Use the centralized API request function
+            return make_api_request(
+                "post",
                 f"{self.base_url}/preprocessing/process",
-                json=payload
+                json={
+                    "file_id": file_id,
+                    "operations": operations
+                }
             )
-
-            return self._handle_response(response, "Preprocessing failed")
         except Exception as e:
-            logger.error(f"Error preprocessing data: {str(e)}")
+            log_error("Failed to preprocess data", e, {
+                'file_id': file_id,
+                'operation_count': len(operations)
+            })
             raise
 
     # Analysis Operations
@@ -240,53 +192,59 @@ class ApiClient:
                     params: Dict[str, Any], use_preprocessed: bool = False) -> Dict[str, Any]:
         """Analyze data according to specified analysis type."""
         try:
-            payload = {
-                "file_id": file_id,
-                "analysis_type": analysis_type,
-                "params": params,
-                "use_preprocessed": use_preprocessed
-            }
-
-            response = requests.post(
+            # Use the centralized API request function
+            return make_api_request(
+                "post",
                 f"{self.base_url}/analysis/analyze",
-                json=payload
+                json={
+                    "file_id": file_id,
+                    "analysis_type": analysis_type,
+                    "params": params,
+                    "use_preprocessed": use_preprocessed
+                }
             )
-
-            return self._handle_response(response, f"{analysis_type.capitalize()} analysis failed")
         except Exception as e:
-            logger.error(f"Error analyzing data: {str(e)}")
+            log_error(f"{analysis_type.capitalize()} analysis failed", e, {
+                'file_id': file_id,
+                'analysis_type': analysis_type,
+                'use_preprocessed': use_preprocessed
+            })
             raise
 
     # Data Operations
     def get_data_preview(self, file_id: str, use_preprocessed: bool = False) -> Dict[str, Any]:
         """Get a preview of the data."""
         try:
-            response = requests.get(
+            # Use the centralized API request function
+            return make_api_request(
+                "get",
                 f"{self.base_url}/data/{file_id}",
                 params={"use_preprocessed": use_preprocessed}
             )
-
-            return self._handle_response(response, "Failed to get data preview")
         except Exception as e:
-            logger.error(f"Error getting data preview: {str(e)}")
+            log_error("Failed to get data preview", e, {
+                'file_id': file_id,
+                'use_preprocessed': use_preprocessed
+            })
             raise
 
     # Transformation Operations
     def transform_data(self, file_id: str, transformation_type: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """Transform data according to specified transformation type."""
         try:
-            payload = {
-                "file_id": file_id,
-                "transformation_type": transformation_type,
-                "params": params
-            }
-
-            response = requests.post(
+            # Use the centralized API request function
+            return make_api_request(
+                "post",
                 f"{self.base_url}/transformation/transform",
-                json=payload
+                json={
+                    "file_id": file_id,
+                    "transformation_type": transformation_type,
+                    "params": params
+                }
             )
-
-            return self._handle_response(response, "Transformation failed")
         except Exception as e:
-            logger.error(f"Error transforming data: {str(e)}")
+            log_error("Transformation failed", e, {
+                'file_id': file_id,
+                'transformation_type': transformation_type
+            })
             raise
