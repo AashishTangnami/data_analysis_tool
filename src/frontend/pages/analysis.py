@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
-import json
 import time
 import threading
 import matplotlib.pyplot as plt
@@ -24,10 +22,10 @@ from components.visualization import (
 # Import the analysis renderers
 from components.analysis_renderers import (
     render_diagnostic_results,
-    render_feature_importance,
-    render_correlation_analysis,
-    render_outlier_detection,
-    create_tabs_for_results
+    # render_feature_importance,
+    # render_correlation_analysis,
+    # render_outlier_detection,
+    # create_tabs_for_results
 )
 
 def render_descriptive_analysis_options():
@@ -903,7 +901,13 @@ def render_analysis_page():
         file_name=file_name
     )
 
-    logger.info(f"Rendering analysis page for file: {st.session_state.file_id}")
+    # Generate a unique key for this rendering to prevent duplicate logs
+    page_render_key = f"analysis_page_render_{st.session_state.file_id}"
+
+    # Only log the first time we render this page with this file
+    if page_render_key not in st.session_state:
+        logger.info(f"Rendering analysis page for file: {st.session_state.file_id}")
+        st.session_state[page_render_key] = True
 
     # Create a layout with two columns for info and status
     col1, col2 = st.columns([3, 1])
