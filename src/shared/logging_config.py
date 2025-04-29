@@ -769,7 +769,9 @@ def get_context_logger(name: str, console_output=False):
     Returns:
         ContextLogger instance
     """
-    logger = get_logger(name, console_output=console_output)
+    # Force console_output to False for Streamlit applications to avoid duplicate logs
+    # Streamlit already captures and displays console output
+    logger = get_logger(name, console_output=False)
     return ContextLogger(logger)
 
 def log_exception(logger, e, context=None):

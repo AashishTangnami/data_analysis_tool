@@ -130,12 +130,16 @@ def render_upload_page():
                 st.error(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
-    # Log application startup
-    logger.add_context(
-        environment="development",
-        component="frontend"
-    ).info("Starting Dynamic Data Analysis Tool Frontend")
-    logger.clear_context()
+    # Only log application startup once per session
+    if "app_startup_logged" not in st.session_state:
+        logger.add_context(
+            environment="development",
+            component="frontend"
+        ).info("Starting Dynamic Data Analysis Tool Frontend")
+        logger.clear_context()
+
+        # Mark that we've logged startup
+        st.session_state.app_startup_logged = True
 
     # Run the main application
     main()

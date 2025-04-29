@@ -549,7 +549,13 @@ def render_preprocessing_page():
         file_name=file_name
     )
 
-    logger.info(f"Rendering preprocessing page for file: {st.session_state.file_id}")
+    # Generate a unique key for this rendering to prevent duplicate logs
+    page_render_key = f"preprocessing_page_render_{st.session_state.file_id}"
+
+    # Only log the first time we render this page with this file
+    if page_render_key not in st.session_state:
+        logger.info(f"Rendering preprocessing page for file: {st.session_state.file_id}")
+        st.session_state[page_render_key] = True
 
     # Display current data info
     st.write(f"**Current Engine:** {engine_type}")

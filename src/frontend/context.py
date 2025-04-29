@@ -87,16 +87,24 @@ class FrontendContext:
             if "preprocessing_operations" in st.session_state:
                 del st.session_state.preprocessing_operations
 
-            # Log with context
-            logger.add_context(
-                file_id=result['file_id'],
-                engine=self.get_current_engine(),
-                file_size=len(uploaded_file.getvalue()),
-                file_name=uploaded_file.name,
-                file_type=uploaded_file.type,
-                user_session_id=id(st.session_state)
-            ).info(f"File uploaded successfully: {result['file_id']}")
-            logger.clear_context()
+            # Generate a unique key for this upload to prevent duplicate logs
+            upload_log_key = f"file_upload_{result['file_id']}"
+
+            # Only log the first time we upload this file
+            if upload_log_key not in st.session_state:
+                # Log with context
+                logger.add_context(
+                    file_id=result['file_id'],
+                    engine=self.get_current_engine(),
+                    file_size=len(uploaded_file.getvalue()),
+                    file_name=uploaded_file.name,
+                    file_type=uploaded_file.type,
+                    user_session_id=id(st.session_state)
+                ).info(f"File uploaded successfully: {result['file_id']}")
+                logger.clear_context()
+
+                # Mark that we've logged this upload
+                st.session_state[upload_log_key] = True
 
             return result
 
