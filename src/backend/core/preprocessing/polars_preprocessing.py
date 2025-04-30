@@ -9,7 +9,7 @@ def _is_numeric_dtype(dtype) -> bool:
     """Helper function to check if a polars dtype is numeric."""
     return any(
         isinstance(dtype, t)
-        for t in (pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64, 
+        for t in (pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64,
                  pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64)
     )
 
@@ -18,29 +18,29 @@ class PolarsPreprocessing(PreprocessingBase):
     """
     Polars implementation of preprocessing strategy.
     """
-    
+
     def process(self, data: pl.DataFrame, operations: List[Dict[str, Any]]) -> pl.DataFrame:
         """
         Apply preprocessing operations to polars DataFrame.
-        
+
         Args:
             data: polars DataFrame
             operations: List of preprocessing operations to apply
-            
+
         Returns:
             Preprocessed polars DataFrame
-            
+
         Raises:
             ValueError: If operation type is not supported
         """
         # Create a copy of the data to avoid modifying the original
         result = data.clone()
-        
+
         # Apply each operation in sequence
         for operation in operations:
             op_type = operation.get("type")
             params = operation.get("params", {})
-            
+
             if op_type == "drop_columns":
                 result = self._drop_columns(result, **params)
             elif op_type == "fill_missing":
@@ -55,13 +55,60 @@ class PolarsPreprocessing(PreprocessingBase):
                 result = self._apply_function(result, **params)
             else:
                 raise ValueError(f"Unsupported operation type: {op_type}")
-        
+
         return result
-    
+
+    def is_operation_valid(self, data: pl.DataFrame, operation: Dict, operation_history: List[Dict]) -> bool:
+        """Check if an operation is valid given the current data state and operation history."""
+        op_type = operation.get("type")
+        params = operation.get("params", {})
+
+        if op_type == "drop_columns":
+            # Check if columns exist
+            columns = params.get("columns", [])
+            if "all" in columns:
+                return len(data.columns) > 0
+            return all(col in data.columns for col in columns)
+
+        elif op_type == "fill_missing":
+            # Check if there are missing values to fill
+            columns = params.get("columns", [])
+            if "all" in columns:
+                # Get the total null count safely
+                null_count_df = data.null_count()
+                # Convert to integer explicitly
+                total_nulls = 0
+                for col in null_count_df.columns:
+                    total_nulls += null_count_df[col].sum()
+                return total_nulls > 0
+            return any(data[col].null_count() > 0 for col in columns if col in data.columns)
+
+        elif op_type == "drop_missing":
+            # Check if there are missing values to drop
+            null_count_df = data.null_count()
+            # Convert to integer explicitly
+            total_nulls = 0
+            for col in null_count_df.columns:
+                total_nulls += null_count_df[col].sum()
+            return total_nulls > 0
+
+        elif op_type == "encode_categorical":
+            # Check if categorical columns exist
+            columns = params.get("columns", [])
+            categorical_cols = [
+                col for col in data.columns
+                if (data[col].dtype == pl.Utf8 or data[col].dtype == pl.Categorical)
+            ]
+            if "all" in columns:
+                return len(categorical_cols) > 0
+            return any(col in categorical_cols for col in columns)
+
+        return True
+
     def get_available_operations(self) -> Dict[str, Dict[str, Any]]:
         """
         Get a dictionary of available preprocessing operations.
-        
+
         Returns:
             Dictionary mapping operation names to their metadata
         """
@@ -108,14 +155,14 @@ class PolarsPreprocessing(PreprocessingBase):
                 }
             }
         }
-    
+
     def _drop_columns(self, data: pl.DataFrame, columns: List[str]) -> pl.DataFrame:
         """Drop specified columns from the DataFrame."""
         if "all" in columns:
             columns = data.columns.tolist()
         return data.drop(columns)
-    
-    def _fill_missing(self, data: pl.DataFrame, columns: Union[List[str], str], 
+
+    def _fill_missing(self, data: pl.DataFrame, columns: Union[List[str], str],
                      method: str = "mean", value: Optional[Any] = None) -> pl.DataFrame:
         """Fill missing values in specified columns."""
         # Handle "all" columns option
@@ -123,7 +170,7 @@ class PolarsPreprocessing(PreprocessingBase):
             target_columns = data.columns
         else:
             target_columns = columns
-        
+
         # Create expressions for each column
         exprs = []
         for col in data.columns:
@@ -147,144 +194,148 @@ class PolarsPreprocessing(PreprocessingBase):
             else:
                 # Keep columns not in target_columns unchanged
                 expr = pl.col(col)
-            
+
             exprs.append(expr)
-        
+
         # Apply all expressions
         return data.select(exprs)
-    
+
     def _drop_missing(self, data: pl.DataFrame, how: str = "any") -> pl.DataFrame:
         """Drop rows with missing values."""
         if how == "any":
             return data.drop_nulls()
         elif how == "all":
             # Keep row if at least one value is not null
-            return data.filter(~pl.all_horizontal(pl.all().is_null()))
+            # Use explicit row-wise check to avoid DataFrame in boolean context
+            mask = pl.Series([False] * data.height)
+            for col in data.columns:
+                mask = mask | ~data[col].is_null()
+            return data.filter(mask)
         else:
             raise ValueError(f"Unsupported 'how' parameter: {how}. Use 'any' or 'all'.")
-    
-    def _encode_categorical(self, data: pl.DataFrame, columns: List[str], 
+
+    def _encode_categorical(self, data: pl.DataFrame, columns: List[str],
                            method: str = "one_hot") -> pl.DataFrame:
         """Encode categorical variables."""
         result = data.clone()
-        
+
         for col in columns:
             if col not in data.columns:
                 continue
-            
+
             if method == "one_hot":
                 # Get unique values
                 unique_vals = data[col].unique().to_list()
-                
+
                 # Create one-hot columns
                 for val in unique_vals:
                     if val is not None:
                         # Create column name for the dummy
                         dummy_col = f"{col}_{val}"
-                        
+
                         # Create dummy column (1 if equal to val, 0 otherwise)
                         result = result.with_column(
                             pl.when(pl.col(col) == val).then(1).otherwise(0).alias(dummy_col)
                         )
-                
+
                 # Drop original column
                 result = result.drop(col)
-                
+
             elif method == "label":
                 # Create a mapping of unique values to integers
                 unique_vals = data[col].unique().to_list()
                 mapping = {val: i for i, val in enumerate(unique_vals) if val is not None}
-                
+
                 # Replace values with their label
                 result = result.with_column(
                     pl.col(col).replace(mapping, default=None).alias(col)
                 )
-            
+
             else:
                 raise ValueError(f"Unsupported encoding method: {method}")
-        
+
         return result
-    
-    def _scale_numeric(self, data: pl.DataFrame, columns: List[str], 
+
+    def _scale_numeric(self, data: pl.DataFrame, columns: List[str],
                       method: str = "standard") -> pl.DataFrame:
         """Scale numeric variables."""
         result = data.clone()
-        
+
         for col in columns:
             if col not in data.columns:
                 continue
-            
+
             # Check if column is numeric
             if not _is_numeric_dtype(data[col].dtype):
                 continue
-            
+
             if method == "standard":
                 # Standardize to mean=0, std=1
                 mean = data[col].mean()
                 std = data[col].std()
-                
+
                 if std > 0:  # Avoid division by zero
                     result = result.with_column(
                         ((pl.col(col) - mean) / std).alias(col)
                     )
-            
+
             elif method == "minmax":
                 # Scale to range [0, 1]
                 min_val = data[col].min()
                 max_val = data[col].max()
-                
+
                 if max_val > min_val:  # Avoid division by zero
                     result = result.with_column(
                         ((pl.col(col) - min_val) / (max_val - min_val)).alias(col)
                     )
-            
+
             else:
                 raise ValueError(f"Unsupported scaling method: {method}")
-        
+
         return result
-    
-    def _apply_function(self, data: pl.DataFrame, columns: List[str], 
+
+    def _apply_function(self, data: pl.DataFrame, columns: List[str],
                        function: str = "log") -> pl.DataFrame:
         """Apply a function to specified columns."""
         result = data.clone()
-        
+
         for col in columns:
             if col not in data.columns:
                 continue
-            
+
             # Check if column is numeric
             if not _is_numeric_dtype(data[col].dtype):
                 continue
-            
+
             if function == "log":
                 # Apply log transformation (handle negative values)
                 min_val = data[col].min()
                 offset = 0 if min_val >= 0 else abs(min_val) + 1
-                
+
                 result = result.with_column(
                     pl.col(col).map_elements(lambda x: np.log(x + offset) if x is not None else None).alias(col)
                 )
-            
+
             elif function == "sqrt":
                 # Apply square root (handle negative values)
                 min_val = data[col].min()
                 offset = 0 if min_val >= 0 else abs(min_val)
-                
+
                 result = result.with_column(
                     pl.col(col).map_elements(lambda x: np.sqrt(x + offset) if x is not None else None).alias(col)
                 )
-            
+
             elif function == "square":
                 result = result.with_column(
                     (pl.col(col) ** 2).alias(col)
                 )
-            
+
             elif function == "absolute":
                 result = result.with_column(
                     pl.col(col).abs().alias(col)
                 )
-            
+
             else:
                 raise ValueError(f"Unsupported function: {function}")
-        
+
         return result

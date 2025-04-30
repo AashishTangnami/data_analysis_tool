@@ -47,7 +47,7 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
         # Make sure feature_columns is a list even if it's passed as a single string
         if isinstance(feature_columns, str):
             feature_columns = [feature_columns]
-            
+
         feature_columns = [col for col in feature_columns if col in data.columns]
         if not feature_columns:
             raise ValueError("No valid feature columns provided")
@@ -64,7 +64,7 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
 
         # Handle missing values for analysis - this creates a new DataFrame and doesn't modify the original
         selected_data_no_na = selected_data.drop_nulls()
-        
+
         if selected_data_no_na.height == 0:
             raise ValueError("After dropping NA values, no data remains for analysis")
 
@@ -98,21 +98,21 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                             if std > 0:
                                 # Create z-scores (only for non-null values)
                                 z_scores = ((col_data_series - mean) / std).alias("z_score")
-                                
+
                                 # Create a temporary dataframe with row numbers to track original positions
                                 indices_df = pl.DataFrame({
                                     "original_index": pl.arange(0, col_data_series.len(), eager=True),
                                     col: col_data_series,
                                     "z_score": z_scores
                                 })
-                                
+
                                 # Find outliers (|z| > threshold)
                                 outliers_df = indices_df.filter((pl.col("z_score")).abs() > outlier_threshold)
-                                
+
                                 # Get first 20 indices and values for consistency with pandas implementation
                                 outlier_indices = outliers_df.select("original_index").head(20).to_series().to_list()
                                 outlier_values = outliers_df.select(pl.col(col)).head(20).to_series().to_list()
-                                
+
                                 # Convert values to regular Python types to ensure serialization works
                                 outlier_values = [float(val) for val in outlier_values]
 
@@ -149,16 +149,16 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                                     "original_index": pl.arange(0, col_data_series.len(), eager=True),
                                     col: col_data_series
                                 })
-                                
+
                                 # Find outliers
                                 outliers_df = indices_df.filter(
                                     (pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)
                                 )
-                                
+
                                 # Get first 20 indices and values for consistency with pandas implementation
                                 outlier_indices = outliers_df.select("original_index").head(20).to_series().to_list()
                                 outlier_values = outliers_df.select(pl.col(col)).head(20).to_series().to_list()
-                                
+
                                 # Convert values to regular Python types to ensure serialization works
                                 outlier_values = [float(val) for val in outlier_values]
 
@@ -192,7 +192,7 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
 
         # Correlation analysis with target
         corr_results = {}
-        
+
         for col in feature_columns:
             try:
                 if _is_numeric_dtype(selected_data[col].dtype):
@@ -200,7 +200,7 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                     valid_data = selected_data.filter(
                         ~pl.col(col).is_null() & ~pl.col(target_column).is_null()
                     )
-                    
+
                     # Skip if not enough data
                     if valid_data.height < 2:
                         corr_results[col] = {
@@ -209,23 +209,27 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                             "error": "Insufficient data for correlation analysis"
                         }
                         continue
-                        
+
                     if _is_numeric_dtype(selected_data[target_column].dtype):
                         # Calculate Pearson correlation using polars
-                        correlation = valid_data.select(pl.corr(col, target_column).alias("correlation")).item(0, 0)
-                        
+                        corr_df = valid_data.select(pl.corr(col, target_column).alias("correlation"))
+                        # Safely extract the correlation value
+                        correlation = None
+                        if corr_df.height > 0 and corr_df.width > 0:
+                            correlation = corr_df[0, 0]
+
                         # For p-value calculation, we need to use scipy.stats
                         # We'll compute this with the to_numpy() method which is more efficient
                         try:
                             from scipy import stats
-                            
+
                             # Get the data as numpy arrays
                             x = valid_data[col].to_numpy()
                             y = valid_data[target_column].to_numpy()
-                            
+
                             # Calculate p-value
                             _, p_value = stats.pearsonr(x, y)
-                            
+
                             corr_results[col] = {
                                 "correlation": float(correlation) if correlation is not None and not np.isnan(correlation) else None,
                                 "p_value": float(p_value) if p_value is not None and not np.isnan(p_value) else None
@@ -240,7 +244,7 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                     else:
                         # For categorical target, use a similar approach to ANOVA F-value
                         categories = valid_data[target_column].unique().drop_nulls()
-                        
+
                         # Skip if there's only one category
                         if categories.len() < 2:
                             corr_results[col] = {
@@ -249,21 +253,21 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                                 "error": "Target has only one category"
                             }
                             continue
-                            
+
                         try:
                             from scipy import stats
-                            
+
                             # We'll convert to pandas temporarily for ANOVA calculation
                             # since polars doesn't have a built-in ANOVA function
                             pd_df = valid_data.select([target_column, col]).to_pandas()
-                            
+
                             # Group the data by category
                             groups = []
                             for cat in categories.to_list():
                                 group_data = pd_df[pd_df[target_column] == cat][col].dropna()
                                 if len(group_data) >= 2:
                                     groups.append(group_data)
-                            
+
                             # Check if we have enough groups
                             if len(groups) < 2:
                                 corr_results[col] = {
@@ -272,22 +276,22 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                                     "error": "Some groups have insufficient samples for ANOVA"
                                 }
                                 continue
-                                
+
                             # Calculate ANOVA
                             f_stat, p_value = stats.f_oneway(*groups)
-                            
+
                             corr_results[col] = {
                                 "correlation": float(f_stat) if not np.isnan(f_stat) else None,
                                 "p_value": float(p_value) if not np.isnan(p_value) else None
                             }
                         except ImportError:
-                            # Fall back to a simple measure of association (eta-squared) 
+                            # Fall back to a simple measure of association (eta-squared)
                             # if scipy is not available
                             overall_mean = valid_data[col].mean()
-                            
+
                             between_ss = 0
                             within_ss = 0
-                            
+
                             # Calculate between-group and within-group sum of squares
                             for cat in categories.to_list():
                                 group_data = valid_data.filter(pl.col(target_column) == cat)
@@ -295,10 +299,10 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                                     group_mean = group_data[col].mean()
                                     group_var = group_data[col].var()
                                     group_size = group_data.height
-                                    
+
                                     between_ss += group_size * ((group_mean - overall_mean) ** 2)
                                     within_ss += (group_size - 1) * group_var
-                            
+
                             # Calculate eta-squared
                             total_ss = between_ss + within_ss
                             if total_ss > 0:

@@ -62,7 +62,12 @@ class PolarsDescriptiveAnalysis(DescriptiveAnalysisBase):
                 # First, calculate count for each column
                 count_dict = {}
                 for col in numeric_cols:
-                    count_dict[col] = selected_data.select(pl.col(col).count()).item(0, 0)
+                    count_df = selected_data.select(pl.col(col).count())
+                    # Safely extract the count value
+                    if count_df.height > 0 and count_df.width > 0:
+                        count_dict[col] = count_df[0, 0]
+                    else:
+                        count_dict[col] = 0
 
                 # Then calculate other statistics for each column
                 for col in numeric_cols:
@@ -108,14 +113,17 @@ class PolarsDescriptiveAnalysis(DescriptiveAnalysisBase):
                     # Skewness: Use polars' built-in skew function
                     # Add null check before accessing
                     skew_df = selected_data.select(pl.col(col).skew().alias("skew"))
-                    skew = skew_df.item(0, 0) if skew_df.height > 0 else None
+                    skew = None
+                    if skew_df.height > 0 and skew_df.width > 0:
+                        skew = skew_df[0, 0]
                     skewness[col] = float(skew) if skew is not None else 0.0
-
 
                     # Kurtosis: Use polars' built-in kurtosis function
                     # Add null check before accessing
                     kurt_df = selected_data.select(pl.col(col).kurtosis().alias("kurt"))
-                    kurt = kurt_df.item(0, 0) if kurt_df.height > 0 else None
+                    kurt = None
+                    if kurt_df.height > 0 and kurt_df.width > 0:
+                        kurt = kurt_df[0, 0]
                     kurtosis[col] = float(kurt) if kurt is not None else 0.0
 
 
@@ -192,7 +200,9 @@ class PolarsDescriptiveAnalysis(DescriptiveAnalysisBase):
                         corr_df = selected_data.select(
                             pl.corr(col1, col2).alias("correlation")
                         )
-                        corr = corr_df.item(0, 0)
+                        corr = None
+                        if corr_df.height > 0 and corr_df.width > 0:
+                            corr = corr_df[0, 0]
 
                         # Handle NaN values the same way pandas does
                         if corr is None or np.isnan(corr):

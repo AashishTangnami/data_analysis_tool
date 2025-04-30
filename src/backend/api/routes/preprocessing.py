@@ -64,6 +64,16 @@ async def preprocess_data(request: PreprocessingRequest):
         pandas_data = engine_context.to_pandas(processed_data)
         preview = pandas_data.head(10).to_dict(orient="records")
 
+        # Calculate impact metrics
+        impact = {
+            "rows_before": original_summary.get("row_count", 0),
+            "rows_after": processed_summary.get("row_count", 0),
+            "columns_before": original_summary.get("column_count", 0),
+            "columns_after": processed_summary.get("column_count", 0),
+            "missing_values_before": original_summary.get("missing_count", 0),
+            "missing_values_after": processed_summary.get("missing_count", 0)
+        }
+
         logger.info(f"Preprocessing completed successfully for file_id: {request.file_id}")
 
         return PreprocessingResponse(
@@ -72,7 +82,8 @@ async def preprocess_data(request: PreprocessingRequest):
             processed_summary=processed_summary,
             preview=preview,
             operations_applied=request.operations,
-            message="Data preprocessed successfully"
+            message="Data preprocessed successfully",
+            impact=impact
         )
 
     except Exception as e:
@@ -127,6 +138,16 @@ async def apply_single_operation(request: SingleOperationRequest):
         pandas_data = engine_context.to_pandas(processed_data)
         preview = pandas_data.head(10).to_dict(orient="records")
 
+        # Calculate impact metrics
+        impact = {
+            "rows_before": original_summary.get("row_count", 0),
+            "rows_after": processed_summary.get("row_count", 0),
+            "columns_before": original_summary.get("column_count", 0),
+            "columns_after": processed_summary.get("column_count", 0),
+            "missing_values_before": original_summary.get("missing_count", 0),
+            "missing_values_after": processed_summary.get("missing_count", 0)
+        }
+
         logger.info(f"Operation {request.operation['type']} completed successfully for file_id: {request.file_id}")
 
         return PreprocessingResponse(
@@ -135,7 +156,8 @@ async def apply_single_operation(request: SingleOperationRequest):
             processed_summary=processed_summary,
             preview=preview,
             operations_applied=[request.operation],
-            message=f"Operation {request.operation['type']} applied successfully"
+            message=f"Operation {request.operation['type']} applied successfully",
+            impact=impact
         )
 
     except Exception as e:
@@ -155,12 +177,10 @@ async def get_available_operations(engine_type: str):
         Dictionary of available operations
     """
     try:
-        # Initialize engine context
-        engine_context = EngineContext(engine_type)
-
-        # Get available operations using the PreprocessingFactory
-        from core.factories.preprocessing_factory import PreprocessingFactory
-        operations = PreprocessingFactory.get_available_operations(engine_type)
+        # Get available operations using the PreprocessingBase factory
+        from src.backend.core.preprocessing.base import PreprocessingBase
+        preprocessor = PreprocessingBase.create(engine_type)
+        operations = preprocessor.get_available_operations()
 
         return {"operations": operations}
 
@@ -197,8 +217,8 @@ async def preview_operation(request: SingleOperationRequest):
         operation_history = await session_manager.get_operation_history(request.file_id)
 
         # Check if operation is valid using the appropriate preprocessor for the engine type
-        from core.factories.preprocessing_factory import PreprocessingFactory
-        preprocessor = PreprocessingFactory.create_strategy(engine_type)
+        from src.backend.core.preprocessing.base import PreprocessingBase
+        preprocessor = PreprocessingBase.create(engine_type)
         if not preprocessor.is_operation_valid(original_data, request.operation, operation_history):
             raise HTTPException(
                 status_code=400,
@@ -292,19 +312,31 @@ async def undo_operation(request: UndoOperationRequest):
         await session_manager.replace_data(request.file_id, processed_data)
 
         # Get summary and preview
+        original_summary = engine_context.get_data_summary(original_data)
         processed_summary = engine_context.get_data_summary(processed_data)
         pandas_data = engine_context.to_pandas(processed_data)
         preview = pandas_data.head(10).to_dict(orient="records")
+
+        # Calculate impact metrics
+        impact = {
+            "rows_before": original_summary.get("row_count", 0),
+            "rows_after": processed_summary.get("row_count", 0),
+            "columns_before": original_summary.get("column_count", 0),
+            "columns_after": processed_summary.get("column_count", 0),
+            "missing_values_before": original_summary.get("missing_count", 0),
+            "missing_values_after": processed_summary.get("missing_count", 0)
+        }
 
         logger.info(f"Operation undone successfully for file_id: {request.file_id}")
 
         return PreprocessingResponse(
             file_id=request.file_id,
-            original_summary=engine_context.get_data_summary(original_data),
+            original_summary=original_summary,
             processed_summary=processed_summary,
             preview=preview,
             operations_applied=applied_operations,
-            message="Operation undone successfully"
+            message="Operation undone successfully",
+            impact=impact
         )
 
     except Exception as e:
@@ -344,6 +376,16 @@ async def clear_operations(request: ClearOperationsRequest):
         pandas_data = engine_context.to_pandas(original_data)
         preview = pandas_data.head(10).to_dict(orient="records")
 
+        # Impact is zero since we're reverting to original data
+        impact = {
+            "rows_before": original_summary.get("row_count", 0),
+            "rows_after": original_summary.get("row_count", 0),
+            "columns_before": original_summary.get("column_count", 0),
+            "columns_after": original_summary.get("column_count", 0),
+            "missing_values_before": original_summary.get("missing_count", 0),
+            "missing_values_after": original_summary.get("missing_count", 0)
+        }
+
         logger.info(f"All operations cleared for file_id: {request.file_id}")
 
         return PreprocessingResponse(
@@ -352,7 +394,8 @@ async def clear_operations(request: ClearOperationsRequest):
             processed_summary=original_summary,  # Same as original since all operations are cleared
             preview=preview,
             operations_applied=[],
-            message="All operations cleared successfully"
+            message="All operations cleared successfully",
+            impact=impact
         )
 
     except Exception as e:

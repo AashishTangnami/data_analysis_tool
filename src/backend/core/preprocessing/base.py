@@ -24,10 +24,10 @@ class PreprocessingBase(ABC):
             ValueError: If engine type is not supported
         """
         if engine_type == "pandas":
-            from core.preprocessing.pandas_preprocessing import PandasPreprocessing
+            from src.backend.core.preprocessing.pandas_preprocessing import PandasPreprocessing
             return PandasPreprocessing()
         elif engine_type == "polars":
-            from core.preprocessing.polars_preprocessing import PolarsPreprocessing
+            from src.backend.core.preprocessing.polars_preprocessing import PolarsPreprocessing
             return PolarsPreprocessing()
         else:
             raise ValueError(f"Unsupported engine type for preprocessing: {engine_type}")
@@ -53,5 +53,20 @@ class PreprocessingBase(ABC):
 
         Returns:
             Dictionary mapping operation names to their metadata
+        """
+        pass
+
+    @abstractmethod
+    def is_operation_valid(self, data: Any, operation: Dict[str, Any], operation_history: List[Dict[str, Any]]) -> bool:
+        """
+        Check if an operation is valid given the current data state and operation history.
+
+        Args:
+            data: Data in the engine's native format
+            operation: Operation to check
+            operation_history: List of previously applied operations
+
+        Returns:
+            True if the operation is valid, False otherwise
         """
         pass

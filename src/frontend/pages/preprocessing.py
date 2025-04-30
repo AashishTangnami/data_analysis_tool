@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
+from typing import Dict, Any, List
 from src.shared.logging_config import get_context_logger
+from src.frontend.context import FrontendContext
 
 # Get logger for this module
 logger = get_context_logger(__name__)
@@ -11,6 +13,8 @@ def render_preprocessing_interface():
     st.subheader("Preprocessing Operations")
 
     # Get the frontend context from session state
+    if "frontend_context" not in st.session_state:
+        st.session_state.frontend_context = FrontendContext()
     frontend_context = st.session_state.frontend_context
 
     try:
@@ -21,7 +25,7 @@ def render_preprocessing_interface():
         # Create tabs for different operation categories
         preprocessing_tabs = st.tabs([
             "Missing Values",
-            "Feature Selection",
+            "Drop Columns",
             "Encoding",
             "Scaling",
             "Feature Engineering"
@@ -65,7 +69,7 @@ def render_preprocessing_interface():
 
                     try:
                         # Get preview of operation effect
-                        preview = frontend_context.preview_operation(operation)
+                        preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
                         # Show preview
                         st.write("**Preview of effect:**")
@@ -73,8 +77,7 @@ def render_preprocessing_interface():
 
                         # Show impact metrics
                         st.write("**Impact:**")
-                        st.write(f"- Missing values before: {preview['impact']['missing_values_before']}")
-                        st.write(f"- Missing values after: {preview['impact']['missing_values_after']}")
+                        display_impact_metrics(preview.get('impact', {}))
 
                         # Add button to apply
                         if st.button("Apply Fill Operation"):
@@ -104,7 +107,7 @@ def render_preprocessing_interface():
 
                     try:
                         # Get preview of operation effect
-                        preview = frontend_context.preview_operation(operation)
+                        preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
                         # Show preview
                         st.write("**Preview of effect:**")
@@ -112,10 +115,7 @@ def render_preprocessing_interface():
 
                         # Show impact metrics
                         st.write("**Impact:**")
-                        st.write(f"- Rows before: {preview['impact']['rows_before']}")
-                        st.write(f"- Rows after: {preview['impact']['rows_after']}")
-                        st.write(f"- Missing values before: {preview['impact']['missing_values_before']}")
-                        st.write(f"- Missing values after: {preview['impact']['missing_values_after']}")
+                        display_impact_metrics(preview.get('impact', {}))
 
                         # Add button to apply
                         if st.button("Apply Drop Operation"):
@@ -147,7 +147,7 @@ def render_preprocessing_interface():
 
                 try:
                     # Get preview of operation effect
-                    preview = frontend_context.preview_operation(operation)
+                    preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
                     # Show preview
                     st.write("**Preview of effect:**")
@@ -155,8 +155,7 @@ def render_preprocessing_interface():
 
                     # Show impact metrics
                     st.write("**Impact:**")
-                    st.write(f"- Columns before: {preview['impact']['columns_before']}")
-                    st.write(f"- Columns after: {preview['impact']['columns_after']}")
+                    display_impact_metrics(preview.get('impact', {}))
 
                     # Add button to apply
                     if st.button("Apply Drop Columns Operation"):
@@ -230,8 +229,7 @@ def render_preprocessing_interface():
 
                         # Show impact metrics
                         st.write("**Impact:**")
-                        st.write(f"- Columns before: {preview['impact']['columns_before']}")
-                        st.write(f"- Columns after: {preview['impact']['columns_after']}")
+                        display_impact_metrics(preview.get('impact', {}))
 
                         # Add button to apply
                         if st.button("Apply Encoding Operation"):
@@ -292,6 +290,12 @@ def render_preprocessing_interface():
 
                         # Show impact metrics
                         st.write("**Impact:**")
+
+                        # First show general impact metrics
+                        display_impact_metrics(preview.get('impact', {}))
+
+                        # Then show column-specific scaling impact
+                        st.write("**Column-specific Scaling Impact:**")
                         col1, col2 = st.columns(2)
                         with col1:
                             st.write(f"**Before Scaling:**")
@@ -365,15 +369,28 @@ def render_preprocessing_interface():
                         st.write("**Preview of effect:**")
                         st.dataframe(pd.DataFrame(preview["preview"]))
 
+                        # Show general impact metrics
+                        st.write("**General Impact:**")
+                        display_impact_metrics(preview.get('impact', {}))
+
                         # Show impact metrics for each column
-                        st.write("**Impact on columns:**")
+                        st.write("**Impact on specific columns:**")
                         for col in columns:
                             before_stats = preview["original_summary"].get("column_stats", {}).get(col, {})
                             after_stats = preview["processed_summary"].get("column_stats", {}).get(col, {})
 
                             st.write(f"**{col}:**")
-                            st.write(f"- Before: min={before_stats.get('min', 'N/A')}, max={before_stats.get('max', 'N/A')}")
-                            st.write(f"- After: min={after_stats.get('min', 'N/A')}, max={after_stats.get('max', 'N/A')}")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write("**Before:**")
+                                st.write(f"- Min: {before_stats.get('min', 'N/A')}")
+                                st.write(f"- Max: {before_stats.get('max', 'N/A')}")
+                                st.write(f"- Mean: {before_stats.get('mean', 'N/A')}")
+                            with col2:
+                                st.write("**After:**")
+                                st.write(f"- Min: {after_stats.get('min', 'N/A')}")
+                                st.write(f"- Max: {after_stats.get('max', 'N/A')}")
+                                st.write(f"- Mean: {after_stats.get('mean', 'N/A')}")
 
                         # Add button to apply
                         if st.button("Apply Transformation"):
@@ -404,6 +421,8 @@ def add_undo_redo_functionality():
             # Apply operations up to this point
             operations = st.session_state.operation_history[:st.session_state.history_position]
             # Get the frontend context from session state
+            if "frontend_context" not in st.session_state:
+                st.session_state.frontend_context = FrontendContext()
             frontend_context = st.session_state.frontend_context
             frontend_context.preprocess_data(operations)
             st.rerun()
@@ -415,6 +434,8 @@ def add_undo_redo_functionality():
             # Apply operations up to this point
             operations = st.session_state.operation_history[:st.session_state.history_position + 1]
             # Get the frontend context from session state
+            if "frontend_context" not in st.session_state:
+                st.session_state.frontend_context = FrontendContext()
             frontend_context = st.session_state.frontend_context
             frontend_context.preprocess_data(operations)
             st.rerun()
@@ -470,6 +491,8 @@ def render_operations_summary():
         # Add apply all button
         if st.button("Apply All Operations", key="apply_all"):
             # Get the frontend context from session state
+            if "frontend_context" not in st.session_state:
+                st.session_state.frontend_context = FrontendContext()
             frontend_context = st.session_state.frontend_context
 
             # Apply preprocessing operations using the frontend context
@@ -501,13 +524,49 @@ def render_operations_summary():
     else:
         st.info("No preprocessing operations selected yet. Add operations from the list above.")
 
+def display_impact_metrics(impact: Dict[str, Any]):
+    """
+    Display impact metrics in a consistent format.
+
+    Args:
+        impact: Dictionary containing impact metrics
+    """
+    if not impact:
+        st.info("No impact metrics available.")
+        return
+
+    # Create columns for before/after comparison
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("**Before:**")
+        st.write(f"- Rows: {impact.get('rows_before', 'N/A')}")
+        st.write(f"- Columns: {impact.get('columns_before', 'N/A')}")
+        st.write(f"- Missing values: {impact.get('missing_values_before', 'N/A')}")
+
+    with col2:
+        st.write("**After:**")
+        st.write(f"- Rows: {impact.get('rows_after', 'N/A')}")
+        st.write(f"- Columns: {impact.get('columns_after', 'N/A')}")
+        st.write(f"- Missing values: {impact.get('missing_values_after', 'N/A')}")
+
+    # Calculate and display changes
+    row_change = impact.get('rows_after', 0) - impact.get('rows_before', 0)
+    col_change = impact.get('columns_after', 0) - impact.get('columns_before', 0)
+    missing_change = impact.get('missing_values_after', 0) - impact.get('missing_values_before', 0)
+
+    st.write("**Changes:**")
+    st.write(f"- Rows: {row_change:+d}")
+    st.write(f"- Columns: {col_change:+d}")
+    st.write(f"- Missing values: {missing_change:+d}")
+
 def render_preprocessing_results():
     """Render before and after preprocessing results."""
     if "preprocessing_applied" in st.session_state and st.session_state.preprocessing_applied:
         st.subheader("Preprocessing Results")
 
         # Create tabs for before/after
-        tab1, tab2 = st.tabs(["Before Preprocessing", "After Preprocessing"])
+        tab1, tab2, tab3 = st.tabs(["Before Preprocessing", "After Preprocessing", "Impact"])
 
         with tab1:
             # Display original data preview
@@ -526,6 +585,23 @@ def render_preprocessing_results():
             # Display processed summary
             with st.expander("Processed Data Summary"):
                 st.json(st.session_state.processed_summary)
+
+        with tab3:
+            # Display impact metrics
+            st.write("**Impact of Preprocessing**")
+            if "impact" in st.session_state:
+                display_impact_metrics(st.session_state.impact)
+            else:
+                # Calculate impact from summaries
+                impact = {
+                    "rows_before": st.session_state.original_summary.get("row_count", 0),
+                    "rows_after": st.session_state.processed_summary.get("row_count", 0),
+                    "columns_before": st.session_state.original_summary.get("column_count", 0),
+                    "columns_after": st.session_state.processed_summary.get("column_count", 0),
+                    "missing_values_before": st.session_state.original_summary.get("missing_count", 0),
+                    "missing_values_after": st.session_state.processed_summary.get("missing_count", 0)
+                }
+                display_impact_metrics(impact)
 
         # Add button to use preprocessed data for analysis
         if st.button("Proceed to Analysis with Preprocessed Data"):
@@ -561,17 +637,43 @@ def render_preprocessing_page():
     st.write(f"**Current Engine:** {engine_type}")
     st.write(f"**File:** {file_name}")
 
+    # Add toggle for showing original vs. preprocessed data
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.write("**Data View:**")
+    with col2:
+        use_preprocessed = st.toggle("Show Preprocessed Data", value=False)
+        if use_preprocessed and "preprocessed_data_preview" in st.session_state:
+            # Update the data preview to show preprocessed data
+            st.session_state.current_view_data = st.session_state.preprocessed_data_preview
+        else:
+            # Show original data
+            st.session_state.current_view_data = st.session_state.data_preview
+
     # Create tabs for data preview and operations
     main_tabs = st.tabs(["Data Preview", "Preprocessing Operations", "Operation History"])
 
     with main_tabs[0]:
         # Display current data preview
         st.subheader("Current Data Preview")
-        st.dataframe(pd.DataFrame(st.session_state.data_preview))
+
+        # Use the current view data (original or preprocessed)
+        if "current_view_data" in st.session_state:
+            st.dataframe(pd.DataFrame(st.session_state.current_view_data))
+        else:
+            st.dataframe(pd.DataFrame(st.session_state.data_preview))
 
         # Display data summary
         with st.expander("Data Summary"):
-            st.json(st.session_state.data_summary)
+            if use_preprocessed and "processed_summary" in st.session_state:
+                st.json(st.session_state.processed_summary)
+            else:
+                st.json(st.session_state.data_summary)
+
+        # If we have both original and preprocessed data, show impact
+        if use_preprocessed and "preprocessed_data_preview" in st.session_state and "impact" in st.session_state:
+            with st.expander("Impact of Preprocessing"):
+                display_impact_metrics(st.session_state.impact)
 
     with main_tabs[1]:
         # Render preprocessing interface with operations
@@ -592,11 +694,24 @@ def render_preprocessing_page():
                 # Create an expander for each operation
                 with st.expander(f"{i+1}. {op_type}", expanded=i==0):
                     # Display parameters
+                    st.write("**Parameters:**")
                     for param_name, param_value in params.items():
                         if isinstance(param_value, list):
-                            st.write(f"**{param_name.replace('_', ' ').title()}**: {', '.join(str(x) for x in param_value)}")
+                            st.write(f"- **{param_name.replace('_', ' ').title()}**: {', '.join(str(x) for x in param_value)}")
                         else:
-                            st.write(f"**{param_name.replace('_', ' ').title()}**: {param_value}")
+                            st.write(f"- **{param_name.replace('_', ' ').title()}**: {param_value}")
+
+                    # Add a button to preview this operation again
+                    if st.button(f"Preview Impact", key=f"preview_impact_{i}"):
+                        # Get the frontend context
+                        frontend_context = st.session_state.frontend_context
+
+                        # Preview the operation
+                        preview = frontend_context.preview_operation(st.session_state.file_id, op)
+
+                        # Show impact metrics
+                        st.write("**Impact of this operation:**")
+                        display_impact_metrics(preview.get('impact', {}))
 
             # Add undo button
             if st.button("Undo Last Operation"):
