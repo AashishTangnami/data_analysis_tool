@@ -1,8 +1,6 @@
 import polars as pl
-import pandas as pd
 import numpy as np
-from scipy import stats
-from typing import Dict, Any
+from typing import Dict, Any, List
 from core.analysis.diagnostic.base import DiagnosticAnalysisBase
 
 
@@ -13,6 +11,7 @@ def _is_numeric_dtype(dtype) -> bool:
         for t in (pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64,
                  pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64)
     )
+
 
 class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
     """
@@ -28,30 +27,34 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
             params: Parameters for the analysis
                 - target_column: Target variable for analysis
                 - feature_columns: List of features to use
-                - run_feature_importance: Whether to run feature importance analysis
                 - run_outlier_detection: Whether to run outlier detection
+                - outlier_method: Method for outlier detection ('zscore' or 'iqr')
+                - outlier_threshold: Threshold for outlier detection
 
         Returns:
             Dictionary containing analysis results
         """
-
         # Extract parameters
         target_column = params.get("target_column")
         feature_columns = params.get("feature_columns", [])
-        run_feature_importance = params.get("run_feature_importance", True)
+        # run_feature_importance = params.get("run_feature_importance", True)  # Commented out to match pandas implementation
         run_outlier_detection = params.get("run_outlier_detection", True)
 
         # Validate inputs
         if not target_column or target_column not in data.columns:
             raise ValueError(f"Target column '{target_column}' not found in data")
 
+        # Make sure feature_columns is a list even if it's passed as a single string
+        if isinstance(feature_columns, str):
+            feature_columns = [feature_columns]
+            
         feature_columns = [col for col in feature_columns if col in data.columns]
         if not feature_columns:
             raise ValueError("No valid feature columns provided")
 
         # Initialize results
         results = {
-            # "feature_importance": {},  # Comment out to match pandas implementation
+            # "feature_importance": {},  # Commented out to match pandas implementation
             "outlier_detection": {},
             "correlation_analysis": {}
         }
@@ -59,69 +62,19 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
         # Select relevant columns
         selected_data = data.select([target_column] + feature_columns)
 
-        # Handle missing values for analysis
-        selected_data = selected_data.drop_nulls()
-
-        # Feature importance analysis
-        if run_feature_importance:
-            try:
-                # For feature importance, we need to convert to pandas and use sklearn
-                # Import here to avoid unnecessary dependencies if not used
-                import pandas as pd
-                from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-
-                # Convert to pandas
-                pandas_df = selected_data.to_pandas()
-
-                # Determine if classification or regression
-                is_categorical = False
-                if not _is_numeric_dtype(selected_data[target_column].dtype) or selected_data[target_column].n_unique() < 10:
-                    is_categorical = True
-
-                # Prepare features and target
-                X = pandas_df[feature_columns]
-                y = pandas_df[target_column]
-
-                # Convert categorical features to numeric
-                for col in X.select_dtypes(include=['object', 'category']).columns:
-                    X[col] = X[col].astype('category').cat.codes
-
-                # Make sure all data is numeric and handle any remaining NaN
-                for col in X.columns:
-                    X[col] = pl.Series(X[col]).to_numeric(X[col], errors='coerce')
-
-                X = X.fillna(X.mean())
-
-                # Train random forest for feature importance
-                if is_categorical:
-                    model = RandomForestClassifier(n_estimators=100, random_state=42)
-                else:
-                    model = RandomForestRegressor(n_estimators=100, random_state=42)
-
-                model.fit(X, y)
-
-                # Get feature importance
-                importances = model.feature_importances_
-
-                # Create a dictionary of feature importance
-                results["feature_importance"] = {
-                    feature: float(importance)
-                    for feature, importance in zip(feature_columns, importances)
-                }
-
-                # Sort by importance
-                results["feature_importance"] = dict(sorted(
-                    results["feature_importance"].items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                ))
-
-            except Exception as e:
-                results["feature_importance"] = {"error": str(e)}
+        # Handle missing values for analysis - this creates a new DataFrame and doesn't modify the original
+        selected_data_no_na = selected_data.drop_nulls()
+        
+        if selected_data_no_na.height == 0:
+            raise ValueError("After dropping NA values, no data remains for analysis")
 
         # Outlier detection
         if run_outlier_detection:
             outlier_results = {}
+
+            # Get outlier method and threshold from params, with defaults
+            outlier_method = params.get("outlier_method", "zscore")
+            outlier_threshold = params.get("outlier_threshold", 3.0)
 
             for col in feature_columns:
                 try:
@@ -130,32 +83,107 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
                         if selected_data[col].is_null().all():
                             continue
 
-                        # Calculate z-score
-                        mean = selected_data[col].mean()
-                        std = selected_data[col].std()
+                        # Calculate outliers based on the specified method
+                        col_data_series = selected_data[col].drop_nulls()
 
-                        if std > 0:
-                            # Create z-score
-                            z_scores = ((selected_data[col] - mean) / std).alias("z_score")
+                        # Skip if no data
+                        if col_data_series.len() == 0:
+                            continue
 
-                            # Find outliers (|z| > 3)
-                            outliers = selected_data.with_column(z_scores).filter(pl.abs(pl.col("z_score")) > 3)
+                        if outlier_method == "zscore":
+                            # Z-score method (default)
+                            mean = col_data_series.mean()
+                            std = col_data_series.std()
 
-                            # Get outlier indices (convert to list for JSON serialization)
-                            # Limit to 20 indices like pandas implementation
-                            outlier_indices = []
-                            if outliers.height > 0:
-                                # Convert to pandas to get indices (simpler than tracking in polars)
-                                pd_outliers = outliers.to_pandas()
-                                outlier_indices = pd_outliers.index.tolist()[:20]
+                            if std > 0:
+                                # Create z-scores (only for non-null values)
+                                z_scores = ((col_data_series - mean) / std).alias("z_score")
+                                
+                                # Create a temporary dataframe with row numbers to track original positions
+                                indices_df = pl.DataFrame({
+                                    "original_index": pl.arange(0, col_data_series.len(), eager=True),
+                                    col: col_data_series,
+                                    "z_score": z_scores
+                                })
+                                
+                                # Find outliers (|z| > threshold)
+                                outliers_df = indices_df.filter((pl.col("z_score")).abs() > outlier_threshold)
+                                
+                                # Get first 20 indices and values for consistency with pandas implementation
+                                outlier_indices = outliers_df.select("original_index").head(20).to_series().to_list()
+                                outlier_values = outliers_df.select(pl.col(col)).head(20).to_series().to_list()
+                                
+                                # Convert values to regular Python types to ensure serialization works
+                                outlier_values = [float(val) for val in outlier_values]
 
-                            # Save results
+                                # Save results
+                                outlier_results[col] = {
+                                    "mean": float(mean),
+                                    "std": float(std),
+                                    "outlier_count": outliers_df.height,
+                                    "outlier_percentage": outliers_df.height / col_data_series.len() * 100,
+                                    "outlier_indices": outlier_indices,
+                                    "outlier_values": outlier_values,
+                                    "method": "zscore",
+                                    "threshold": outlier_threshold
+                                }
+
+                            else:
+                                outlier_results[col] = {
+                                    "error": "Standard deviation is zero, cannot calculate z-scores"
+                                }
+
+                        elif outlier_method == "iqr":
+                            # IQR method
+                            q1 = col_data_series.quantile(0.25)
+                            q3 = col_data_series.quantile(0.75)
+                            iqr = q3 - q1
+
+                            if iqr > 0:
+                                # Define bounds
+                                lower_bound = q1 - outlier_threshold * iqr
+                                upper_bound = q3 + outlier_threshold * iqr
+
+                                # Create a temporary dataframe with row numbers to track original positions
+                                indices_df = pl.DataFrame({
+                                    "original_index": pl.arange(0, col_data_series.len(), eager=True),
+                                    col: col_data_series
+                                })
+                                
+                                # Find outliers
+                                outliers_df = indices_df.filter(
+                                    (pl.col(col) < lower_bound) | (pl.col(col) > upper_bound)
+                                )
+                                
+                                # Get first 20 indices and values for consistency with pandas implementation
+                                outlier_indices = outliers_df.select("original_index").head(20).to_series().to_list()
+                                outlier_values = outliers_df.select(pl.col(col)).head(20).to_series().to_list()
+                                
+                                # Convert values to regular Python types to ensure serialization works
+                                outlier_values = [float(val) for val in outlier_values]
+
+                                # Save results
+                                outlier_results[col] = {
+                                    "q1": float(q1),
+                                    "q3": float(q3),
+                                    "iqr": float(iqr),
+                                    "lower_bound": float(lower_bound),
+                                    "upper_bound": float(upper_bound),
+                                    "outlier_count": outliers_df.height,
+                                    "outlier_percentage": outliers_df.height / col_data_series.len() * 100,
+                                    "outlier_indices": outlier_indices,
+                                    "outlier_values": outlier_values,
+                                    "method": "iqr",
+                                    "threshold": outlier_threshold
+                                }
+                            else:
+                                outlier_results[col] = {
+                                    "error": "IQR is zero, cannot detect outliers"
+                                }
+                        else:
+                            # Unsupported method
                             outlier_results[col] = {
-                                "mean": float(mean),
-                                "std": float(std),
-                                "outlier_count": outliers.height,
-                                "outlier_percentage": outliers.height / selected_data.height * 100,
-                                "outlier_indices": outlier_indices
+                                "error": f"Unsupported outlier detection method: {outlier_method}"
                             }
                 except Exception as e:
                     outlier_results[col] = {"error": str(e)}
@@ -164,34 +192,134 @@ class PolarsDiagnosticAnalysis(DiagnosticAnalysisBase):
 
         # Correlation analysis with target
         corr_results = {}
-
+        
         for col in feature_columns:
             try:
-                if _is_numeric_dtype(selected_data[col].dtype) and _is_numeric_dtype(selected_data[target_column].dtype):
-                    # Calculate Pearson correlation
-                    corr_df = selected_data.select(pl.corr(col, target_column).alias("correlation"))
-
-                    # Check if we got a valid result
-                    if corr_df.height > 0:
-                        corr = corr_df.item(0, 0)
-
-                        # Convert to pandas for p-value calculation
-                        pd_col = selected_data[col].to_pandas()
-                        pd_target = selected_data[target_column].to_pandas()
-
-                        # Calculate p-value
-                        _, p_value = stats.pearsonr(pd_col, pd_target)
-
-                        corr_results[col] = {
-                            "correlation": float(corr) if corr is not None else 0.0,
-                            "p_value": p_value
-                        }
-                    else:
+                if _is_numeric_dtype(selected_data[col].dtype):
+                    # Get data without nulls for this column and target
+                    valid_data = selected_data.filter(
+                        ~pl.col(col).is_null() & ~pl.col(target_column).is_null()
+                    )
+                    
+                    # Skip if not enough data
+                    if valid_data.height < 2:
                         corr_results[col] = {
                             "correlation": None,
                             "p_value": None,
-                            "error": "Could not calculate correlation"
+                            "error": "Insufficient data for correlation analysis"
                         }
+                        continue
+                        
+                    if _is_numeric_dtype(selected_data[target_column].dtype):
+                        # Calculate Pearson correlation using polars
+                        correlation = valid_data.select(pl.corr(col, target_column).alias("correlation")).item(0, 0)
+                        
+                        # For p-value calculation, we need to use scipy.stats
+                        # We'll compute this with the to_numpy() method which is more efficient
+                        try:
+                            from scipy import stats
+                            
+                            # Get the data as numpy arrays
+                            x = valid_data[col].to_numpy()
+                            y = valid_data[target_column].to_numpy()
+                            
+                            # Calculate p-value
+                            _, p_value = stats.pearsonr(x, y)
+                            
+                            corr_results[col] = {
+                                "correlation": float(correlation) if correlation is not None and not np.isnan(correlation) else None,
+                                "p_value": float(p_value) if p_value is not None and not np.isnan(p_value) else None
+                            }
+                        except ImportError:
+                            # If scipy is not available
+                            corr_results[col] = {
+                                "correlation": float(correlation) if correlation is not None and not np.isnan(correlation) else None,
+                                "p_value": None,
+                                "note": "P-value calculation requires scipy.stats module"
+                            }
+                    else:
+                        # For categorical target, use a similar approach to ANOVA F-value
+                        categories = valid_data[target_column].unique().drop_nulls()
+                        
+                        # Skip if there's only one category
+                        if categories.len() < 2:
+                            corr_results[col] = {
+                                "correlation": None,
+                                "p_value": None,
+                                "error": "Target has only one category"
+                            }
+                            continue
+                            
+                        try:
+                            from scipy import stats
+                            
+                            # We'll convert to pandas temporarily for ANOVA calculation
+                            # since polars doesn't have a built-in ANOVA function
+                            pd_df = valid_data.select([target_column, col]).to_pandas()
+                            
+                            # Group the data by category
+                            groups = []
+                            for cat in categories.to_list():
+                                group_data = pd_df[pd_df[target_column] == cat][col].dropna()
+                                if len(group_data) >= 2:
+                                    groups.append(group_data)
+                            
+                            # Check if we have enough groups
+                            if len(groups) < 2:
+                                corr_results[col] = {
+                                    "correlation": None,
+                                    "p_value": None,
+                                    "error": "Some groups have insufficient samples for ANOVA"
+                                }
+                                continue
+                                
+                            # Calculate ANOVA
+                            f_stat, p_value = stats.f_oneway(*groups)
+                            
+                            corr_results[col] = {
+                                "correlation": float(f_stat) if not np.isnan(f_stat) else None,
+                                "p_value": float(p_value) if not np.isnan(p_value) else None
+                            }
+                        except ImportError:
+                            # Fall back to a simple measure of association (eta-squared) 
+                            # if scipy is not available
+                            overall_mean = valid_data[col].mean()
+                            
+                            between_ss = 0
+                            within_ss = 0
+                            
+                            # Calculate between-group and within-group sum of squares
+                            for cat in categories.to_list():
+                                group_data = valid_data.filter(pl.col(target_column) == cat)
+                                if group_data.height >= 2:
+                                    group_mean = group_data[col].mean()
+                                    group_var = group_data[col].var()
+                                    group_size = group_data.height
+                                    
+                                    between_ss += group_size * ((group_mean - overall_mean) ** 2)
+                                    within_ss += (group_size - 1) * group_var
+                            
+                            # Calculate eta-squared
+                            total_ss = between_ss + within_ss
+                            if total_ss > 0:
+                                eta_squared = between_ss / total_ss
+                                corr_results[col] = {
+                                    "correlation": float(eta_squared),
+                                    "p_value": None,
+                                    "note": "Using eta-squared as measure of association; p-value unavailable without scipy"
+                                }
+                            else:
+                                corr_results[col] = {
+                                    "correlation": None,
+                                    "p_value": None,
+                                    "error": "Could not calculate association measure"
+                                }
+                else:
+                    corr_results[col] = {
+                        "correlation": None,
+                        "p_value": None,
+                        "error": "Feature is not numeric"
+                    }
             except Exception as e:
                 corr_results[col] = {
                     "correlation": None,
