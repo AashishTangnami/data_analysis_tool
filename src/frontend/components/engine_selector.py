@@ -1,4 +1,5 @@
 import streamlit as st
+from src.frontend.context import FrontendContext
 
 def render_engine_selector():
     """

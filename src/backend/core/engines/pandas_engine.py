@@ -64,17 +64,17 @@ class PandasEngine(EngineBase):
 
         # Use the appropriate method based on operation type
         if op_type == "drop_columns":
-            return self.preprocessor._drop_columns(data, **params)
+            return self.preprocessing._drop_columns(data, **params)
         elif op_type == "fill_missing":
-            return self.preprocessor._fill_missing(data, **params)
+            return self.preprocessing._fill_missing(data, **params)
         elif op_type == "drop_missing":
-            return self.preprocessor._drop_missing(data, **params)
+            return self.preprocessing._drop_missing(data, **params)
         elif op_type == "encode_categorical":
-            return self.preprocessor._encode_categorical(data, **params)
+            return self.preprocessing._encode_categorical(data, **params)
         elif op_type == "scale_numeric":
-            return self.preprocessor._scale_numeric(data, **params)
+            return self.preprocessing._scale_numeric(data, **params)
         elif op_type == "apply_function":
-            return self.preprocessor._apply_function(data, **params)
+            return self.preprocessing._apply_function(data, **params)
         else:
             raise ValueError(f"Unsupported operation type: {op_type}")
 

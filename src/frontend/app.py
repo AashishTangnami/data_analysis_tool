@@ -1,5 +1,5 @@
 import streamlit as st
-from context import FrontendContext
+from src.frontend.context import FrontendContext
 from components.engine_selector import render_engine_selector
 from components.file_uploader import render_file_uploader
 from components.data_preview import render_data_preview

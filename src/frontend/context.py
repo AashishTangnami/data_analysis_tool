@@ -132,7 +132,16 @@ class FrontendContext:
         """
         try:
             # Delegate to the API client
-            return self.api_client.preview_operation(file_id, operation)
+            result = self.api_client.preview_operation(file_id, operation)
+
+            # Store preview results in session state for easy access
+            st.session_state.preview_result = result
+
+            # Store impact metrics if available
+            if "impact" in result:
+                st.session_state.preview_impact = result["impact"]
+
+            return result
         except Exception as e:
             logger.error(f"Error previewing operation: {str(e)}")
             raise
@@ -150,7 +159,25 @@ class FrontendContext:
         """
         try:
             # Delegate to the API client
-            return self.api_client.apply_single_operation(file_id, operation)
+            result = self.api_client.apply_single_operation(file_id, operation)
+
+            # Update session state with the latest data preview
+            if "preview" in result:
+                st.session_state.data_preview = result["preview"]
+
+            # Store impact metrics if available
+            if "impact" in result:
+                st.session_state.impact = result["impact"]
+
+            # Add operation to history if not already there
+            if "preprocessing_operations" not in st.session_state:
+                st.session_state.preprocessing_operations = []
+
+            # Check if operation is already in the list
+            if operation not in st.session_state.preprocessing_operations:
+                st.session_state.preprocessing_operations.append(operation)
+
+            return result
         except Exception as e:
             logger.error(f"Error applying operation: {str(e)}")
             raise
@@ -186,6 +213,10 @@ class FrontendContext:
             st.session_state.data_preview = result["preview"]
             st.session_state.preprocessing_applied = True
             st.session_state.preprocessing_operations = operations
+
+            # Store impact metrics if available
+            if "impact" in result:
+                st.session_state.impact = result["impact"]
 
             logger.info(f"Preprocessing applied successfully for file: {st.session_state.file_id}")
             return result

@@ -16,6 +16,7 @@ class PreprocessingResponse(BaseModel):
     preview: List[Dict[str, Any]]
     operations_applied: List[Dict[str, Any]]
     message: str
+    impact: Optional[Dict[str, Any]] = None
 
 class AnalysisResponse(BaseModel):
     """Response model for analysis operations"""

@@ -3,6 +3,7 @@ import pandas as pd
 import time
 import threading
 from src.shared.logging_config import get_context_logger
+from src.frontend.context import FrontendContext
 
 # Get logger for this module
 logger = get_context_logger(__name__)
