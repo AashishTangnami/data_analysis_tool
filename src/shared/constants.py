@@ -11,6 +11,7 @@ class FileType(str, Enum):
     CSV = "csv"
     EXCEL = "excel"
     JSON = "json"
+    PARQUET = "parquet"
 
 class AnalysisType(str, Enum):
     """Enum for supported analysis types."""

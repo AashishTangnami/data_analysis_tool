@@ -131,7 +131,11 @@ async def apply_single_operation(request: SingleOperationRequest):
         # Generate summary for processed data
         processed_summary = engine_context.get_data_summary(processed_data)
 
-        # Replace the data in the session manager to avoid memory duplication
+        # Store the processed data in the session manager as preprocessed data
+        # This ensures consistency with the preprocess_data endpoint
+        await session_manager.store_preprocessed_data(request.file_id, processed_data)
+
+        # Also update the original data to maintain consistency for future operations
         await session_manager.replace_data(request.file_id, processed_data)
 
         # Convert to pandas and get preview
@@ -308,7 +312,11 @@ async def undo_operation(request: UndoOperationRequest):
         new_history = [op for i, op in enumerate(operation_history) if i != request.operation_index]
         await session_manager.set_operation_history(request.file_id, new_history)
 
-        # Replace data in session
+        # Store the processed data in the session manager as preprocessed data
+        # This ensures consistency with other preprocessing endpoints
+        await session_manager.store_preprocessed_data(request.file_id, processed_data)
+
+        # Also update the original data to maintain consistency for future operations
         await session_manager.replace_data(request.file_id, processed_data)
 
         # Get summary and preview

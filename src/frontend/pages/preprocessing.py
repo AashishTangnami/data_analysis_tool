@@ -71,13 +71,9 @@ def render_preprocessing_interface():
                         # Get preview of operation effect
                         preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
-                        # Show preview
+                        # Show side-by-side preview
                         st.write("**Preview of effect:**")
-                        st.dataframe(pd.DataFrame(preview["preview"]))
-
-                        # Show impact metrics
-                        st.write("**Impact:**")
-                        display_impact_metrics(preview.get('impact', {}))
+                        display_side_by_side_preview(preview)
 
                         # Add button to apply
                         if st.button("Apply Fill Operation"):
@@ -109,13 +105,9 @@ def render_preprocessing_interface():
                         # Get preview of operation effect
                         preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
-                        # Show preview
+                        # Show side-by-side preview
                         st.write("**Preview of effect:**")
-                        st.dataframe(pd.DataFrame(preview["preview"]))
-
-                        # Show impact metrics
-                        st.write("**Impact:**")
-                        display_impact_metrics(preview.get('impact', {}))
+                        display_side_by_side_preview(preview)
 
                         # Add button to apply
                         if st.button("Apply Drop Operation"):
@@ -149,13 +141,9 @@ def render_preprocessing_interface():
                     # Get preview of operation effect
                     preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
-                    # Show preview
+                    # Show side-by-side preview
                     st.write("**Preview of effect:**")
-                    st.dataframe(pd.DataFrame(preview["preview"]))
-
-                    # Show impact metrics
-                    st.write("**Impact:**")
-                    display_impact_metrics(preview.get('impact', {}))
+                    display_side_by_side_preview(preview)
 
                     # Add button to apply
                     if st.button("Apply Drop Columns Operation"):
@@ -223,13 +211,9 @@ def render_preprocessing_interface():
                         # Get preview of operation effect
                         preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
-                        # Show preview
+                        # Show side-by-side preview
                         st.write("**Preview of effect:**")
-                        st.dataframe(pd.DataFrame(preview["preview"]))
-
-                        # Show impact metrics
-                        st.write("**Impact:**")
-                        display_impact_metrics(preview.get('impact', {}))
+                        display_side_by_side_preview(preview)
 
                         # Add button to apply
                         if st.button("Apply Encoding Operation"):
@@ -284,31 +268,25 @@ def render_preprocessing_interface():
                         # Get preview of operation effect
                         preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
-                        # Show preview
+                        # Show side-by-side preview
                         st.write("**Preview of effect:**")
-                        st.dataframe(pd.DataFrame(preview["preview"]))
+                        display_side_by_side_preview(preview)
 
-                        # Show impact metrics
-                        st.write("**Impact:**")
-
-                        # First show general impact metrics
-                        display_impact_metrics(preview.get('impact', {}))
-
-                        # Then show column-specific scaling impact
+                        # Show column-specific scaling impact
                         st.write("**Column-specific Scaling Impact:**")
                         col1, col2 = st.columns(2)
                         with col1:
                             st.write(f"**Before Scaling:**")
                             for col in columns:
                                 if col != "all":
-                                    stats = preview["original_summary"].get("column_stats", {}).get(col, {})
+                                    stats = preview["original_summary"].get("numeric_summary", {}).get(col, {})
                                     st.write(f"- {col}: mean={stats.get('mean', 'N/A')}, std={stats.get('std', 'N/A')}")
 
                         with col2:
                             st.write(f"**After Scaling:**")
                             for col in columns:
                                 if col != "all":
-                                    stats = preview["processed_summary"].get("column_stats", {}).get(col, {})
+                                    stats = preview["processed_summary"].get("numeric_summary", {}).get(col, {})
                                     st.write(f"- {col}: mean={stats.get('mean', 'N/A')}, std={stats.get('std', 'N/A')}")
 
                         # Add button to apply
@@ -365,19 +343,15 @@ def render_preprocessing_interface():
                         # Get preview of operation effect
                         preview = frontend_context.preview_operation(st.session_state.file_id, operation)
 
-                        # Show preview
+                        # Show side-by-side preview
                         st.write("**Preview of effect:**")
-                        st.dataframe(pd.DataFrame(preview["preview"]))
-
-                        # Show general impact metrics
-                        st.write("**General Impact:**")
-                        display_impact_metrics(preview.get('impact', {}))
+                        display_side_by_side_preview(preview)
 
                         # Show impact metrics for each column
                         st.write("**Impact on specific columns:**")
                         for col in columns:
-                            before_stats = preview["original_summary"].get("column_stats", {}).get(col, {})
-                            after_stats = preview["processed_summary"].get("column_stats", {}).get(col, {})
+                            before_stats = preview["original_summary"].get("numeric_summary", {}).get(col, {})
+                            after_stats = preview["processed_summary"].get("numeric_summary", {}).get(col, {})
 
                             st.write(f"**{col}:**")
                             col1, col2 = st.columns(2)
@@ -470,7 +444,10 @@ def render_operations_summary():
                 if st.button("⬇️", key=f"down_{i}") and i < len(operations) - 1:
                     operations[i], operations[i+1] = operations[i+1], operations[i]
                     st.rerun()
+
+
     render_operations_order_control()
+
     if "preprocessing_operations" in st.session_state and st.session_state.preprocessing_operations:
         st.subheader("Operations to Apply")
 
@@ -524,6 +501,193 @@ def render_operations_summary():
     else:
         st.info("No preprocessing operations selected yet. Add operations from the list above.")
 
+def display_side_by_side_preview(preview: Dict[str, Any]):
+    """
+    Display side-by-side comparison of original and processed data with impact metrics.
+
+    Args:
+        preview: Dictionary containing preview information
+    """
+    if not preview:
+        st.info("No preview information available.")
+        return
+
+    # Show column changes if available - display this first for better visibility
+    if "original_summary" in preview and "processed_summary" in preview:
+        original_cols = set(preview["original_summary"].get("columns", []))
+        processed_cols = set(preview["processed_summary"].get("columns", []))
+
+        # Find added and removed columns
+        added_cols = processed_cols - original_cols
+        removed_cols = original_cols - processed_cols
+
+        if added_cols or removed_cols:
+            st.write("**Column Changes**")
+
+            # Create columns for better visual separation
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if removed_cols:
+                    st.warning(f"**Removed Columns ({len(removed_cols)}):**")
+                    for col in sorted(removed_cols):
+                        st.write(f"- {col}")
+
+            with col2:
+                if added_cols:
+                    st.success(f"**Added Columns ({len(added_cols)}):**")
+                    for col in sorted(added_cols):
+                        st.write(f"- {col}")
+
+    # Create columns for original and processed data
+    col1, col2 = st.columns(2)
+
+    # Get original and processed data
+    original_data = pd.DataFrame(preview.get("original_preview", []))
+    if original_data.empty and "original_summary" in preview:
+        # Try to reconstruct from summary
+        original_data = pd.DataFrame(preview.get("preview", []))
+
+    processed_data = pd.DataFrame(preview.get("preview", []))
+
+    # Get operation type if available
+    operation_type = None
+    if "operations_applied" in preview and preview["operations_applied"]:
+        if isinstance(preview["operations_applied"], list) and preview["operations_applied"]:
+            operation_type = preview["operations_applied"][0].get("type", "")
+
+    # Customize preview based on operation type
+    if "original_summary" in preview and "processed_summary" in preview:
+        original_cols = set(preview["original_summary"].get("columns", []))
+        processed_cols = set(preview["processed_summary"].get("columns", []))
+        removed_cols = original_cols - processed_cols
+        added_cols = processed_cols - original_cols
+
+        with col1:
+            st.write("**Original Data**")
+
+            # Create a styled dataframe based on operation type
+            if not original_data.empty:
+                # Create a copy to avoid modifying the original
+                styled_df = original_data.copy()
+
+                # Create a base styler
+                styler = styled_df.style
+
+                # Apply styling based on operation type
+                if operation_type == "drop_columns" and removed_cols:
+                    # Highlight columns that will be removed
+                    for col in removed_cols:
+                        if col in styled_df.columns:
+                            styler = styler.set_properties(
+                                subset=[col],
+                                **{'background-color': '#FFCCCB'}  # Light red
+                            )
+
+                    # Add a note about highlighted columns
+                    st.dataframe(styler, height=200)
+                    st.caption("🔴 Columns highlighted in red will be removed")
+
+                elif operation_type == "fill_missing":
+                    # Try to highlight cells with missing values
+                    # Apply styling to highlight missing values
+                    def highlight_missing(val):
+                        return 'background-color: #FFCCCB' if pd.isna(val) else ''
+
+                    styler = styler.map(highlight_missing)
+
+                    # Display the styled dataframe
+                    st.dataframe(styler, height=200)
+                    st.caption("🔴 Cells highlighted in red contain missing values that will be filled")
+
+                elif operation_type == "encode_categorical":
+                    # Try to highlight categorical columns that will be encoded
+                    params = preview["operations_applied"][0].get("params", {})
+                    columns_to_encode = params.get("columns", [])
+
+                    if columns_to_encode:
+                        for col in columns_to_encode:
+                            if col in styled_df.columns:
+                                styler = styler.set_properties(
+                                    subset=[col],
+                                    **{'background-color': '#E6F3FF'}  # Light blue
+                                )
+
+                        # Display the styled dataframe
+                        st.dataframe(styler, height=200)
+                        st.caption("🔵 Columns highlighted in blue will be encoded")
+                    else:
+                        st.dataframe(styled_df, height=200)
+
+                else:
+                    # Just show the original data without styling
+                    st.dataframe(styled_df, height=200)
+            else:
+                # Just show the original data without styling
+                st.dataframe(original_data, height=200)
+
+            # Show column count
+            if "original_summary" in preview:
+                col_count = len(preview["original_summary"].get("columns", []))
+                st.caption(f"Columns: {col_count}")
+
+        with col2:
+            st.write("**Processed Data (Preview)**")
+
+            # For added columns, highlight them in the processed data
+            if not processed_data.empty and added_cols:
+                # Create a copy to avoid modifying the original
+                styled_df = processed_data.copy()
+
+                # Create a base styler
+                styler = styled_df.style
+
+                # Highlight added columns
+                for col in added_cols:
+                    if col in styled_df.columns:
+                        styler = styler.set_properties(
+                            subset=[col],
+                            **{'background-color': '#CCFFCC'}  # Light green
+                        )
+
+                # Display the styled dataframe
+                st.dataframe(styler, height=200)
+
+                # Add a note about highlighted columns
+                if added_cols:
+                    st.caption("🟢 Columns highlighted in green were added during processing")
+            else:
+                # Display the processed data
+                st.dataframe(processed_data, height=200)
+
+            # Show column count
+            if "processed_summary" in preview:
+                col_count = len(preview["processed_summary"].get("columns", []))
+                st.caption(f"Columns: {col_count}")
+    else:
+        # If we don't have column information, just show the data without styling
+        with col1:
+            st.write("**Original Data**")
+            st.dataframe(original_data, height=200)
+
+            # Show column count
+            if "original_summary" in preview:
+                col_count = len(preview["original_summary"].get("columns", []))
+                st.caption(f"Columns: {col_count}")
+
+        with col2:
+            st.write("**Processed Data (Preview)**")
+            st.dataframe(processed_data, height=200)
+
+            # Show column count
+            if "processed_summary" in preview:
+                col_count = len(preview["processed_summary"].get("columns", []))
+                st.caption(f"Columns: {col_count}")
+
+    # Display impact metrics
+    # st.write("**Impact Metrics**")
+    # display_impact_metrics(preview.get('impact', {}))
+
 def display_impact_metrics(impact: Dict[str, Any]):
     """
     Display impact metrics in a consistent format.
@@ -561,53 +725,80 @@ def display_impact_metrics(impact: Dict[str, Any]):
     st.write(f"- Missing values: {missing_change:+d}")
 
 def render_preprocessing_results():
-    """Render before and after preprocessing results."""
+    """Render before and after preprocessing results side-by-side."""
     if "preprocessing_applied" in st.session_state and st.session_state.preprocessing_applied:
         st.subheader("Preprocessing Results")
 
-        # Create tabs for before/after
-        tab1, tab2, tab3 = st.tabs(["Before Preprocessing", "After Preprocessing", "Impact"])
+        # Display impact metrics at the top
+        st.write("**Impact of Preprocessing**")
+        if "impact" in st.session_state:
+            display_impact_metrics(st.session_state.impact)
+        else:
+            # Calculate impact from summaries
+            impact = {
+                "rows_before": st.session_state.original_summary.get("row_count", 0),
+                "rows_after": st.session_state.processed_summary.get("row_count", 0),
+                "columns_before": st.session_state.original_summary.get("column_count", 0),
+                "columns_after": st.session_state.processed_summary.get("column_count", 0),
+                "missing_values_before": st.session_state.original_summary.get("missing_count", 0),
+                "missing_values_after": st.session_state.processed_summary.get("missing_count", 0)
+            }
+            display_impact_metrics(impact)
 
-        with tab1:
-            # Display original data preview
-            st.write("**Original Data Preview**")
-            st.dataframe(pd.DataFrame(st.session_state.data_preview))
+        # Create side-by-side columns for before/after data preview
+        col1, col2 = st.columns(2)
 
-            # Display original summary
+        with col1:
+            st.write("**Original Data**")
+            st.dataframe(pd.DataFrame(st.session_state.data_preview), height=300)
             with st.expander("Original Data Summary"):
                 st.json(st.session_state.original_summary)
 
-        with tab2:
-            # Display processed data preview
-            st.write("**Processed Data Preview**")
-            st.dataframe(pd.DataFrame(st.session_state.preprocessed_data_preview))
-
-            # Display processed summary
+        with col2:
+            st.write("**Processed Data**")
+            st.dataframe(pd.DataFrame(st.session_state.preprocessed_data_preview), height=300)
             with st.expander("Processed Data Summary"):
                 st.json(st.session_state.processed_summary)
 
-        with tab3:
-            # Display impact metrics
-            st.write("**Impact of Preprocessing**")
-            if "impact" in st.session_state:
-                display_impact_metrics(st.session_state.impact)
-            else:
-                # Calculate impact from summaries
-                impact = {
-                    "rows_before": st.session_state.original_summary.get("row_count", 0),
-                    "rows_after": st.session_state.processed_summary.get("row_count", 0),
-                    "columns_before": st.session_state.original_summary.get("column_count", 0),
-                    "columns_after": st.session_state.processed_summary.get("column_count", 0),
-                    "missing_values_before": st.session_state.original_summary.get("missing_count", 0),
-                    "missing_values_after": st.session_state.processed_summary.get("missing_count", 0)
-                }
-                display_impact_metrics(impact)
+        # Add a section to highlight changes
+        st.write("**Column Changes**")
 
-        # Add button to use preprocessed data for analysis
-        if st.button("Proceed to Analysis with Preprocessed Data"):
-            st.session_state.use_preprocessed = True
-            st.session_state.page = "Analysis"
-            st.rerun()
+        # Get column lists
+        original_cols = set(st.session_state.original_summary.get("columns", []))
+        processed_cols = set(st.session_state.processed_summary.get("columns", []))
+
+        # Find added and removed columns
+        added_cols = processed_cols - original_cols
+        removed_cols = original_cols - processed_cols
+
+        # Display changes
+        if added_cols:
+            st.success(f"Added columns: {', '.join(added_cols)}")
+        if removed_cols:
+            st.warning(f"Removed columns: {', '.join(removed_cols)}")
+        if not added_cols and not removed_cols:
+            st.info("No columns were added or removed")
+
+        # Add buttons to proceed to analysis with data choice
+        st.write("**Proceed to Analysis:**")
+
+        # Create columns for the data choice options
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Use Original Data", key="results_use_original", type="secondary"):
+                st.session_state.use_preprocessed = False
+                st.session_state.page = "Analysis"
+                st.rerun()
+
+        with col2:
+            if st.button("Use Preprocessed Data", key="results_use_preprocessed", type="primary"):
+                st.session_state.use_preprocessed = True
+                st.session_state.page = "Analysis"
+                st.rerun()
+
+        # Add a note about the data choice
+        st.info("💡 You can always switch between original and preprocessed data on the Analysis page.")
 
 # Removed commented-out code for better maintainability
 
@@ -637,92 +828,219 @@ def render_preprocessing_page():
     st.write(f"**Current Engine:** {engine_type}")
     st.write(f"**File:** {file_name}")
 
-    # Add toggle for showing original vs. preprocessed data
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.write("**Data View:**")
-    with col2:
-        use_preprocessed = st.toggle("Show Preprocessed Data", value=False)
-        if use_preprocessed and "preprocessed_data_preview" in st.session_state:
-            # Update the data preview to show preprocessed data
-            st.session_state.current_view_data = st.session_state.preprocessed_data_preview
-        else:
-            # Show original data
-            st.session_state.current_view_data = st.session_state.data_preview
+    # =====================================================================
+    # DATA PREVIEW SECTION
+    # =====================================================================
+    st.header("Data Preview")
 
-    # Create tabs for data preview and operations
-    main_tabs = st.tabs(["Data Preview", "Preprocessing Operations", "Operation History"])
+    # Check if preprocessed data is available
+    has_preprocessed = "preprocessed_data_preview" in st.session_state
 
-    with main_tabs[0]:
-        # Display current data preview
-        st.subheader("Current Data Preview")
+    if has_preprocessed:
+        # Show side-by-side comparison
+        st.write("**Side-by-Side Comparison**")
 
-        # Use the current view data (original or preprocessed)
-        if "current_view_data" in st.session_state:
-            st.dataframe(pd.DataFrame(st.session_state.current_view_data))
-        else:
-            st.dataframe(pd.DataFrame(st.session_state.data_preview))
+        # Create columns for original and processed data
+        col1, col2 = st.columns(2)
 
-        # Display data summary
-        with st.expander("Data Summary"):
-            if use_preprocessed and "processed_summary" in st.session_state:
-                st.json(st.session_state.processed_summary)
-            else:
+        with col1:
+            st.write("**Original Data**")
+            st.dataframe(pd.DataFrame(st.session_state.data_preview), height=300)
+            with st.expander("Original Data Summary"):
                 st.json(st.session_state.data_summary)
 
-        # If we have both original and preprocessed data, show impact
-        if use_preprocessed and "preprocessed_data_preview" in st.session_state and "impact" in st.session_state:
-            with st.expander("Impact of Preprocessing"):
-                display_impact_metrics(st.session_state.impact)
+        with col2:
+            st.write("**Processed Data**")
+            st.dataframe(pd.DataFrame(st.session_state.preprocessed_data_preview), height=300)
+            with st.expander("Processed Data Summary"):
+                st.json(st.session_state.processed_summary)
 
-    with main_tabs[1]:
-        # Render preprocessing interface with operations
-        render_preprocessing_interface()
+        # Show impact metrics
+        if "impact" in st.session_state:
+            st.write("**Impact of Preprocessing**")
+            display_impact_metrics(st.session_state.impact)
 
-    with main_tabs[2]:
-        # Render operation history with undo/redo functionality
-        st.subheader("Operation History")
+        # Show column changes
+        st.write("**Column Changes**")
 
-        if "preprocessing_operations" in st.session_state and st.session_state.preprocessing_operations:
-            operations = st.session_state.preprocessing_operations
+        # Get column lists
+        original_cols = set(st.session_state.data_summary.get("columns", []))
+        processed_cols = set(st.session_state.processed_summary.get("columns", []))
 
-            # Display operations in a table
-            for i, op in enumerate(operations):
-                op_type = op["type"].replace("_", " ").title()
-                params = op.get("params", {})
+        # Find added and removed columns
+        added_cols = processed_cols - original_cols
+        removed_cols = original_cols - processed_cols
 
-                # Create an expander for each operation
-                with st.expander(f"{i+1}. {op_type}", expanded=i==0):
-                    # Display parameters
-                    st.write("**Parameters:**")
-                    for param_name, param_value in params.items():
+        # Display changes with better formatting
+        if added_cols or removed_cols:
+            # Create columns for better visual separation
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if removed_cols:
+                    st.warning(f"**Removed Columns ({len(removed_cols)}):**")
+                    for col in sorted(removed_cols):
+                        st.write(f"- {col}")
+
+            with col2:
+                if added_cols:
+                    st.success(f"**Added Columns ({len(added_cols)}):**")
+                    for col in sorted(added_cols):
+                        st.write(f"- {col}")
+        else:
+            st.info("No columns were added or removed")
+    else:
+        # Just show original data
+        st.write("**Original Data**")
+        st.dataframe(pd.DataFrame(st.session_state.data_preview))
+        with st.expander("Data Summary"):
+            st.json(st.session_state.data_summary)
+
+        st.info("Apply preprocessing operations below to see side-by-side comparison")
+
+    # =====================================================================
+    # PREPROCESSING OPERATIONS SECTION
+    # =====================================================================
+    st.header("Preprocessing Operations")
+    st.write("Apply preprocessing operations step-by-step:")
+
+    # Render preprocessing interface with operations
+    render_preprocessing_interface()
+
+    # =====================================================================
+    # OPERATION HISTORY SECTION
+    # =====================================================================
+    st.header("Operation History")
+
+    if "preprocessing_operations" in st.session_state and st.session_state.preprocessing_operations:
+        operations = st.session_state.preprocessing_operations
+
+        # Display operations in a table
+        for i, op in enumerate(operations):
+            op_type = op["type"].replace("_", " ").title()
+            params = op.get("params", {})
+
+            # Create a more descriptive title for the operation
+            operation_title = f"{i+1}. {op_type}"
+
+            # Add specific details to the title based on operation type
+            if op_type == "Drop Columns":
+                columns = params.get("columns", [])
+                if columns:
+                    if len(columns) <= 3:
+                        operation_title += f": {', '.join(columns)}"
+                    else:
+                        operation_title += f": {len(columns)} columns"
+            elif op_type == "Fill Missing":
+                method = params.get("method", "")
+                operation_title += f" ({method})"
+            elif op_type == "Encode Categorical":
+                method = params.get("method", "")
+                operation_title += f" ({method})"
+            elif op_type == "Scale Numeric":
+                method = params.get("method", "")
+                operation_title += f" ({method})"
+            elif op_type == "Apply Function":
+                function = params.get("function", "")
+                operation_title += f" ({function})"
+
+            # Create an expander for each operation
+            with st.expander(operation_title, expanded=i==0):
+                # Display parameters with better formatting
+                st.write("**Parameters:**")
+
+                # Format parameters based on operation type
+                for param_name, param_value in params.items():
+                    if param_name == "columns":
+                        if isinstance(param_value, list):
+                            if param_value:
+                                if len(param_value) > 10:
+                                    # Show count for large lists
+                                    st.write(f"- **Columns**: {len(param_value)} columns")
+                                    with st.expander("Show all columns"):
+                                        st.write(", ".join(str(x) for x in param_value))
+                                else:
+                                    # Show all for smaller lists
+                                    st.write(f"- **Columns**: {', '.join(str(x) for x in param_value)}")
+                            else:
+                                st.write("- **Columns**: None")
+                        else:
+                            st.write(f"- **Columns**: {param_value}")
+                    else:
+                        # Format other parameters
                         if isinstance(param_value, list):
                             st.write(f"- **{param_name.replace('_', ' ').title()}**: {', '.join(str(x) for x in param_value)}")
                         else:
                             st.write(f"- **{param_name.replace('_', ' ').title()}**: {param_value}")
 
-                    # Add a button to preview this operation again
-                    if st.button(f"Preview Impact", key=f"preview_impact_{i}"):
-                        # Get the frontend context
-                        frontend_context = st.session_state.frontend_context
+                # Add a button to preview this operation again
+                if st.button(f"Preview Impact", key=f"preview_impact_{i}"):
+                    # Get the frontend context
+                    frontend_context = st.session_state.frontend_context
 
-                        # Preview the operation
-                        preview = frontend_context.preview_operation(st.session_state.file_id, op)
+                    # Preview the operation
+                    preview = frontend_context.preview_operation(st.session_state.file_id, op)
 
-                        # Show impact metrics
-                        st.write("**Impact of this operation:**")
-                        display_impact_metrics(preview.get('impact', {}))
+                    # Show side-by-side preview
+                    st.write("**Impact of this operation:**")
+                    display_side_by_side_preview(preview)
 
+                    # For drop columns operation, explicitly show dropped columns
+                    if op_type == "Drop Columns":
+                        columns = params.get("columns", [])
+                        if columns:
+                            st.warning(f"**Dropped Columns**: {', '.join(columns)}")
+
+        # Add operation controls
+        col1, col2 = st.columns(2)
+
+        with col1:
             # Add undo button
             if st.button("Undo Last Operation"):
                 if operations:
-                    operations.pop()
-                    st.success("Last operation removed")
+                    last_op = operations.pop()
+                    op_type = last_op["type"].replace("_", " ").title()
+                    st.success(f"Removed: {op_type}")
                     st.rerun()
-        else:
-            st.info("No preprocessing operations have been applied yet.")
 
-    # Add button to proceed to analysis
-    if st.button("Proceed to Analysis"):
-        st.session_state.page = "Analysis"
-        st.rerun()
+        with col2:
+            # Add clear all button
+            if st.button("Clear All Operations"):
+                st.session_state.preprocessing_operations = []
+                st.success("All operations cleared")
+                st.rerun()
+    else:
+        st.info("No preprocessing operations have been applied yet.")
+
+    # =====================================================================
+    # PROCEED TO ANALYSIS SECTION
+    # =====================================================================
+    st.header("Proceed to Analysis")
+
+    # Only show data choice if preprocessing has been applied
+    if "preprocessed_data_preview" in st.session_state:
+        st.write("Choose which data to use for analysis:")
+
+        # Create columns for the data choice options
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("Use Original Data", key="use_original", type="secondary"):
+                st.session_state.use_preprocessed = False
+                st.session_state.page = "Analysis"
+                st.rerun()
+
+        with col2:
+            if st.button("Use Preprocessed Data", key="use_preprocessed", type="primary"):
+                st.session_state.use_preprocessed = True
+                st.session_state.page = "Analysis"
+                st.rerun()
+
+        # Add a note about the data choice
+        st.info("💡 You can always switch between original and preprocessed data on the Analysis page.")
+    else:
+        # If no preprocessing has been applied, just show a single button
+        if st.button("Proceed to Analysis", type="primary"):
+            st.session_state.use_preprocessed = False
+            st.session_state.page = "Analysis"
+            st.rerun()
