@@ -467,17 +467,26 @@ def render_diagnostic_analysis_options():
         help="Only numeric columns can be used for feature importance and correlation analysis"
     )
 
-    # First, create the options list
-    available_options = [col for col in columns if col != target_column]
+    # Get column data types
+    col_dtypes = st.session_state.data_summary.get("dtypes", {})
 
-    # Then filter numeric_cols to only include available options
-    available_numeric_cols = [col for col in numeric_cols if col in available_options]
+    # Filter out string/object columns that can't be used for feature importance
+    non_string_cols = [col for col in columns if col != target_column and
+                      (col in numeric_cols or
+                       "category" in str(col_dtypes.get(col, "")).lower() or
+                       "bool" in str(col_dtypes.get(col, "")).lower())]
 
-    # Now use the filtered list for defaults
+    # Show warning if there are columns that will be excluded
+    excluded_cols = [col for col in columns if col not in non_string_cols and col != target_column]
+    if excluded_cols:
+        st.warning(f"String columns will be excluded from feature importance calculations: {', '.join(excluded_cols)}")
+
+    # Use only non-string columns for feature selection
     feature_columns = st.multiselect(
-        "Select feature columns",
-        options=available_options,
-        default=available_numeric_cols[:4] if len(available_numeric_cols) > 4 else available_numeric_cols
+        "Select feature columns (string columns excluded)",
+        options=non_string_cols,
+        default=non_string_cols[:4] if len(non_string_cols) > 4 else non_string_cols,
+        help="String/object columns are excluded as they cannot be used for feature importance calculations"
     )
 
     # Analysis options
@@ -528,11 +537,27 @@ def render_predictive_analysis_options():
         help=target_help
     )
 
+    # Get column data types
+    col_dtypes = st.session_state.data_summary.get("dtypes", {})
+
+    # For feature columns, we need to be careful with string columns
+    # They need to be encoded first, so let's warn the user
+    string_cols = [col for col in columns if col != target_column and
+                  ("object" in str(col_dtypes.get(col, "")).lower() or
+                   "string" in str(col_dtypes.get(col, "")).lower())]
+
+    # Get non-string columns that can be used for modeling
+    non_string_cols = [col for col in columns if col != target_column and col not in string_cols]
+
+    if string_cols:
+        st.warning(f"String columns detected: {', '.join(string_cols)}. These should be encoded before using in predictive models.")
+
     # Select feature columns
     feature_columns = st.multiselect(
         "Select feature columns",
-        options=[col for col in columns if col != target_column],
-        default=numeric_cols[:4] if len(numeric_cols) > 4 else numeric_cols
+        options=non_string_cols,
+        default=numeric_cols[:4] if len(numeric_cols) > 4 else numeric_cols,
+        help="String columns should be encoded before using in predictive models"
     )
 
     # Model selection

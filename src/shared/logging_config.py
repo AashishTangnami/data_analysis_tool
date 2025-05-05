@@ -886,6 +886,9 @@ def log_api_request(logger, method, endpoint, correlation_id=None):
 
     return logger
 
+# These functions have been moved to frontend/utils/logging_helpers.py
+# to avoid circular imports
+
 # Initialize root logger
 root_logger = logging.getLogger()
 if not root_logger.handlers:

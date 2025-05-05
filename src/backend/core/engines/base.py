@@ -103,7 +103,7 @@ class EngineBase(ABC):
             file_path: Path to the file
 
         Returns:
-            File type as string (csv, excel, json)
+            File type as string (csv, excel, json, parquet)
 
         Raises:
             ValueError: If file type is not supported
@@ -117,6 +117,8 @@ class EngineBase(ABC):
             return 'excel'
         elif extension == '.json':
             return 'json'
+        elif extension == '.parquet':
+            return 'parquet'
         else:
             raise ValueError(f"Unsupported file type: {extension}")
 

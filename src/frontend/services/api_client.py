@@ -21,23 +21,7 @@ class ApiClient:
         """Initialize the API client with the base URL."""
         self.base_url = base_url
 
-    def _handle_response(self, response, error_message: str = "API request failed", request_info: Optional[Dict[str, Any]] = None):
-        """
-        Process API response and handle errors consistently.
-
-        Args:
-            response: Response object from requests
-            error_message: Custom error message prefix
-            request_info: Additional request information for logging
-
-        Returns:
-            Parsed JSON response
-
-        Raises:
-            Exception: If response indicates an error
-        """
-        # Use the centralized utility function
-        return handle_api_response(response, error_message, request_info)
+    # This method is no longer needed as we use the centralized utility function directly
 
     # File Operations
     def upload_file(self, file, engine_type: str) -> Dict[str, Any]:
@@ -84,7 +68,7 @@ class ApiClient:
             duration_ms = int((time.time() - start_time) * 1000)
 
             # Handle the response with additional context
-            return self._handle_response(
+            return handle_api_response(
                 response,
                 "File upload failed",
                 {**file_info, 'request_duration_ms': duration_ms}

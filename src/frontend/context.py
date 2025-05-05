@@ -165,6 +165,14 @@ class FrontendContext:
             if "preview" in result:
                 st.session_state.data_preview = result["preview"]
 
+            # Update data summary if available
+            if "processed_summary" in result:
+                st.session_state.data_summary = result["processed_summary"]
+
+            # Mark that preprocessing has been applied
+            st.session_state.preprocessing_applied = True
+            st.session_state.use_preprocessed = True
+
             # Store impact metrics if available
             if "impact" in result:
                 st.session_state.impact = result["impact"]
@@ -176,6 +184,20 @@ class FrontendContext:
             # Check if operation is already in the list
             if operation not in st.session_state.preprocessing_operations:
                 st.session_state.preprocessing_operations.append(operation)
+
+            # Also update operation_history for undo/redo functionality
+            if "operation_history" not in st.session_state:
+                st.session_state.operation_history = []
+                st.session_state.history_position = 0
+            else:
+                st.session_state.history_position += 1
+
+            # Add to operation history
+            if len(st.session_state.operation_history) > st.session_state.history_position:
+                # Truncate history if we're not at the end
+                st.session_state.operation_history = st.session_state.operation_history[:st.session_state.history_position]
+
+            st.session_state.operation_history.append(operation)
 
             return result
         except Exception as e:
@@ -209,14 +231,26 @@ class FrontendContext:
                 operations
             )
 
-            # Update session state
-            st.session_state.data_preview = result["preview"]
+            # Update session state with the latest data preview
+            if "preview" in result:
+                st.session_state.data_preview = result["preview"]
+
+            # Update data summary if available
+            if "processed_summary" in result:
+                st.session_state.data_summary = result["processed_summary"]
+
+            # Mark that preprocessing has been applied
             st.session_state.preprocessing_applied = True
+            st.session_state.use_preprocessed = True
             st.session_state.preprocessing_operations = operations
 
             # Store impact metrics if available
             if "impact" in result:
                 st.session_state.impact = result["impact"]
+
+            # Update operation history for undo/redo functionality
+            st.session_state.operation_history = operations.copy()
+            st.session_state.history_position = len(operations) - 1 if operations else -1
 
             logger.info(f"Preprocessing applied successfully for file: {st.session_state.file_id}")
             return result
@@ -306,9 +340,17 @@ class FrontendContext:
                 use_preprocessed
             )
 
-            # Update session state
-            st.session_state.data_preview = result.get("data", [])
-            st.session_state.data_summary = result.get("summary", {})
+            # Update session state with the latest data preview
+            if "preview" in result:
+                st.session_state.data_preview = result["preview"]
+            elif "data" in result:
+                st.session_state.data_preview = result["data"]
+
+            # Update data summary if available
+            if "summary" in result:
+                st.session_state.data_summary = result["summary"]
+
+            # Mark whether we're using preprocessed data
             st.session_state.use_preprocessed = use_preprocessed
 
             logger.info(f"Data preview updated to {'preprocessed' if use_preprocessed else 'original'} data")
@@ -420,3 +462,4 @@ class FrontendContext:
         except Exception as e:
             logger.error(f"Clear operations error: {str(e)}")
             raise
+

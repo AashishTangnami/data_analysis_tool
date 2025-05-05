@@ -4,6 +4,9 @@ Session management for data persistence.
 import asyncio
 import logging
 import sys
+import os
+import json
+import pickle
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 
@@ -25,6 +28,12 @@ class SessionManager:
 
         # Operation history
         self.operation_history: Dict[str, List[Dict[str, Any]]] = {}
+
+        # Path for session persistence
+        self.persistence_dir = os.path.join("data", "sessions")
+
+        # Create persistence directory if it doesn't exist
+        os.makedirs(self.persistence_dir, exist_ok=True)
 
     async def store_file(self, file_id: str, file_path: str) -> None:
         """
@@ -417,3 +426,181 @@ class SessionManager:
             del self.data_store[file_id]
             self.current_cache_size -= item_size
             logger.info(f"Evicted {file_id} from cache (size: {item_size} bytes)")
+
+    async def save_session_state(self, session_id: str) -> bool:
+        """
+        Save the current session state to disk for persistence.
+
+        Args:
+            session_id: Unique identifier for the session
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            async with self._lock:
+                # Create a serializable version of the session state
+                session_data = {
+                    "timestamp": datetime.now().isoformat(),
+                    "data_store": {},
+                    "operation_history": self.operation_history
+                }
+
+                # For each item in data_store, save metadata but handle data separately
+                for file_id, item in self.data_store.items():
+                    # Copy metadata
+                    session_data["data_store"][file_id] = {
+                        "type": item.get("type", "unknown"),
+                        "created_at": item.get("created_at", datetime.now()).isoformat(),
+                        "last_accessed": item.get("last_accessed", datetime.now()).isoformat(),
+                        "size": item.get("size", 0)
+                    }
+
+                # Save metadata as JSON
+                metadata_path = os.path.join(self.persistence_dir, f"{session_id}_metadata.json")
+                with open(metadata_path, "w") as f:
+                    json.dump(session_data, f, indent=2)
+
+                # Save actual data separately using pickle for each file
+                for file_id, item in self.data_store.items():
+                    if item.get("type") == "file":
+                        # For file paths, just save the path
+                        data_path = os.path.join(self.persistence_dir, f"{session_id}_{file_id}.path")
+                        with open(data_path, "w") as f:
+                            f.write(item.get("data", ""))
+                    else:
+                        # For other data, use pickle
+                        data_path = os.path.join(self.persistence_dir, f"{session_id}_{file_id}.pickle")
+                        with open(data_path, "wb") as f:
+                            pickle.dump(item.get("data"), f)
+
+                logger.info(f"Session state saved for session_id: {session_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error saving session state: {str(e)}")
+            return False
+
+    async def load_session_state(self, session_id: str) -> bool:
+        """
+        Load a previously saved session state from disk.
+
+        Args:
+            session_id: Unique identifier for the session
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Check if metadata file exists
+            metadata_path = os.path.join(self.persistence_dir, f"{session_id}_metadata.json")
+            if not os.path.exists(metadata_path):
+                logger.warning(f"No saved session found for session_id: {session_id}")
+                return False
+
+            # Load metadata
+            with open(metadata_path, "r") as f:
+                session_data = json.load(f)
+
+            async with self._lock:
+                # Clear current state
+                self.data_store = {}
+                self.current_cache_size = 0
+
+                # Load operation history
+                if "operation_history" in session_data:
+                    self.operation_history = session_data["operation_history"]
+
+                # Load data for each file_id
+                for file_id, metadata in session_data.get("data_store", {}).items():
+                    data_type = metadata.get("type", "unknown")
+
+                    if data_type == "file":
+                        # Load file path
+                        path_file = os.path.join(self.persistence_dir, f"{session_id}_{file_id}.path")
+                        if os.path.exists(path_file):
+                            with open(path_file, "r") as f:
+                                file_path = f.read().strip()
+
+                            # Check if the file still exists
+                            if os.path.exists(file_path):
+                                self.data_store[file_id] = {
+                                    "data": file_path,
+                                    "type": "file",
+                                    "created_at": datetime.fromisoformat(metadata.get("created_at")),
+                                    "last_accessed": datetime.fromisoformat(metadata.get("last_accessed")),
+                                    "size": 0  # File paths don't count toward cache size
+                                }
+                            else:
+                                logger.warning(f"File not found: {file_path}")
+                    else:
+                        # Load data from pickle
+                        pickle_file = os.path.join(self.persistence_dir, f"{session_id}_{file_id}.pickle")
+                        if os.path.exists(pickle_file):
+                            with open(pickle_file, "rb") as f:
+                                data = pickle.load(f)
+
+                            # Calculate data size
+                            data_size = self._estimate_data_size(data)
+
+                            # Store data
+                            self.data_store[file_id] = {
+                                "data": data,
+                                "type": data_type,
+                                "created_at": datetime.fromisoformat(metadata.get("created_at")),
+                                "last_accessed": datetime.fromisoformat(metadata.get("last_accessed")),
+                                "size": data_size
+                            }
+
+                            # Update cache size
+                            self.current_cache_size += data_size
+
+                logger.info(f"Session state loaded for session_id: {session_id}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error loading session state: {str(e)}")
+            return False
+
+    async def delete_session(self, session_id: str) -> bool:
+        """
+        Delete a saved session from disk.
+
+        Args:
+            session_id: Unique identifier for the session
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Check if metadata file exists
+            metadata_path = os.path.join(self.persistence_dir, f"{session_id}_metadata.json")
+            if not os.path.exists(metadata_path):
+                logger.warning(f"No saved session found for session_id: {session_id}")
+                return False
+
+            # Load metadata to get file_ids
+            with open(metadata_path, "r") as f:
+                session_data = json.load(f)
+
+            # Delete data files
+            for file_id in session_data.get("data_store", {}).keys():
+                # Try to delete both path and pickle files
+                path_file = os.path.join(self.persistence_dir, f"{session_id}_{file_id}.path")
+                pickle_file = os.path.join(self.persistence_dir, f"{session_id}_{file_id}.pickle")
+
+                if os.path.exists(path_file):
+                    os.remove(path_file)
+
+                if os.path.exists(pickle_file):
+                    os.remove(pickle_file)
+
+            # Delete metadata file
+            os.remove(metadata_path)
+
+            logger.info(f"Session deleted for session_id: {session_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error deleting session: {str(e)}")
+            return False
