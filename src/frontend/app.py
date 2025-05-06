@@ -3,7 +3,7 @@ from src.frontend.context import FrontendContext
 from components.engine_selector import render_engine_selector
 from components.file_uploader import render_file_uploader
 from components.data_preview import render_data_preview
-from pages.preprocessing import render_preprocessing_page
+from src.frontend.pages.preprocessing_old import render_preprocessing_page
 from pages.analysis import render_analysis_page
 from src.shared.logging_config import get_context_logger
 
@@ -80,8 +80,8 @@ def main():
         if "file_id" not in st.session_state or st.session_state.file_id is None:
             st.warning("Please upload a file first.")
             render_upload_page()
-        else:
-            render_preprocessing_page()
+        # else:
+        #     render_preprocessing_page()
     elif page == "Analysis":
         if st.session_state.file_id is None:
             st.warning("Please upload a file first.")
@@ -116,10 +116,10 @@ def render_upload_page():
 
                 # Add buttons to navigate to preprocessing or analysis
                 col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Proceed to Preprocessing"):
-                        st.session_state.page = "Preprocessing"
-                        st.rerun()
+                # with col1:
+                #     if st.button("Proceed to Preprocessing"):
+                #         st.session_state.page = "Preprocessing"
+                #         st.rerun()
 
                 with col2:
                     if st.button("Proceed to Analysis"):
