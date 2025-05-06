@@ -725,6 +725,24 @@ def render_analysis_results():
         # Display different results based on analysis type using the imported renderers
         if st.session_state.analysis_type == "descriptive":
             render_descriptive_results()
+            from components.preprocessing import dimensional_ui
+            dimensional_ui.render_dimensional_modeling_options()
+           
+            from components.preprocessing import olap_ui
+            olap_ui.render_olap_optimization_options()
+
+            from components.preprocessing import text_ui
+            text_ui.render_text_cleaning_options()
+
+            text_ui.render_text_preprocessing_options()
+            from components.preprocessing import time_series_ui
+            time_series_ui.render_time_series_options()
+
+            from components.preprocessing import feature_selection_ui
+            feature_selection_ui.render_feature_selection_options()
+
+            
+            
         elif st.session_state.analysis_type == "diagnostic":
             render_diagnostic_results()
         elif st.session_state.analysis_type == "predictive":
