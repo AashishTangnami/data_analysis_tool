@@ -4,15 +4,8 @@ from pydantic import BaseModel, Field, field_validator
 from core.context import EngineContext
 from api.models.responses import AnalysisResponse
 from src.shared.constants import EngineType, AnalysisType
-from src.shared.logging_config import get_context_logger
-
-# Configure logging
-logger = get_context_logger(__name__)
 
 router = APIRouter()
-
-# Get the session manager instance from ingestion
-from api.routes.ingestion import session_manager
 
 class AnalysisRequest(BaseModel):
     """Request model for analysis operations"""
@@ -20,7 +13,7 @@ class AnalysisRequest(BaseModel):
     analysis_type: str = Field(..., description="Type of analysis to perform (descriptive, diagnostic, predictive, prescriptive)")
     params: Dict[str, Any] = Field({}, description="Parameters for the analysis")
     use_preprocessed: bool = Field(False, description="Whether to use preprocessed data if available")
-
+    
     @field_validator('analysis_type')
     def validate_analysis_type(cls, v):
         """Validate that the analysis type is supported."""
@@ -29,7 +22,7 @@ class AnalysisRequest(BaseModel):
         except ValueError:
             supported_types = [t.value for t in AnalysisType]
             raise ValueError(f"Unsupported analysis type: {v}. Supported types: {', '.join(supported_types)}")
-
+        
     @field_validator('file_id')
     def validate_file_id(cls, v):
         """Validate that the file ID has a valid engine type."""
@@ -37,7 +30,7 @@ class AnalysisRequest(BaseModel):
             parts = v.split('_', 1)
             if len(parts) < 2:
                 raise ValueError("File ID must be in format 'engine_filename'")
-
+            
             engine_type = parts[0]
             EngineType(engine_type)  # Will raise ValueError if invalid
             return v
@@ -49,72 +42,43 @@ class AnalysisRequest(BaseModel):
 async def analyze_data(request: AnalysisRequest):
     """
     Analyze data according to specified analysis type.
-
+    
     Args:
         request: AnalysisRequest with file_id, analysis_type, and params
-
+        
     Returns:
         AnalysisResponse with analysis results
     """
-    # Check if data exists in session
-    data = None
-
+    from api.routes.ingestion import data_storage
+    from api.routes.preprocessing import preprocessed_data_storage
+    
+    # Check if file exists
+    if request.file_id not in data_storage:
+        raise HTTPException(status_code=404, detail=f"File not found with ID: {request.file_id}")
+    
     # Use preprocessed data if requested and available
-    if request.use_preprocessed:
-        data = await session_manager.get_preprocessed_data(request.file_id)
-        if data is not None:
-            logger.info(f"Using preprocessed data for file_id: {request.file_id}")
-
-    # If no preprocessed data or not requested, use original data
-    if data is None:
-        data = await session_manager.get_data(request.file_id)
-        if data is None:
-            raise HTTPException(status_code=404, detail=f"File not found with ID: {request.file_id}")
-
-    # Set file context for logging
-    # Handle different data types safely
-    if hasattr(data, 'dtypes') and hasattr(data.dtypes, 'get'):
-        file_type = data.dtypes.get('__file_type__', 'unknown')
-    elif hasattr(data, 'schema') and isinstance(data.schema, dict):
-        file_type = data.schema.get('__file_type__', 'unknown')
-    elif isinstance(data, dict) and 'dtypes' in data:
-        file_type = data['dtypes'].get('__file_type__', 'unknown') if isinstance(data['dtypes'], dict) else 'unknown'
+    if request.use_preprocessed and request.file_id in preprocessed_data_storage:
+        data = preprocessed_data_storage[request.file_id]
     else:
-        # Default fallback
-        file_type = 'unknown'
-
-    logger.set_file_context(
-        file_id=request.file_id,
-        file_type=file_type
-    )
-
-    # Set request context for logging
-    logger.set_request_context(
-        method="POST",
-        endpoint="/api/analysis/analyze"
-    )
-
+        data = data_storage[request.file_id]
+    
     try:
-        logger.info(f"Analyzing data for file_id: {request.file_id}, analysis type: {request.analysis_type}")
-
         # Get engine type from file_id
         engine_type = request.file_id.split("_")[0]
-
+        
         # Initialize engine context
         engine_context = EngineContext(engine_type)
-
+        
         # Perform analysis
         analysis_results = engine_context.analyze_data(
-            data,
+            data, 
             request.analysis_type,
             request.params
         )
-
+        
         # Generate visualization data based on analysis type and results
         visualizations = generate_visualizations(request.analysis_type, analysis_results)
-
-        logger.success(f"Analysis completed successfully for file_id: {request.file_id}")
-
+        
         return AnalysisResponse(
             file_id=request.file_id,
             analysis_type=request.analysis_type,
@@ -122,33 +86,23 @@ async def analyze_data(request: AnalysisRequest):
             visualizations=visualizations,
             message=f"{request.analysis_type.capitalize()} analysis completed successfully"
         )
-
-    except ValueError as e:
-        # For expected errors like invalid parameters
-        logger.failure(f"Error analyzing data (validation error): {str(e)}")
-        logger.exception("Analysis failed with validation exception")
-        raise HTTPException(status_code=400, detail=str(e))
+        
     except Exception as e:
-        # For unexpected errors
-        logger.failure(f"Error analyzing data (internal error): {str(e)}")
-        logger.exception("Analysis failed with exception")
-        # Return a more detailed error message for debugging
-        error_detail = f"Internal server error during analysis: {str(e)}"
-        raise HTTPException(status_code=500, detail=error_detail)
+        raise HTTPException(status_code=400, detail=str(e))
 
 def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Generate visualization configurations based on analysis type and results.
-
+    
     Args:
         analysis_type: Type of analysis performed
         analysis_results: Results from the analysis
-
+        
     Returns:
         List of visualization configurations
     """
     visualizations = []
-
+    
     if analysis_type == "descriptive":
         # Add visualizations for descriptive analysis
         if "numeric_analysis" in analysis_results and "statistics" in analysis_results["numeric_analysis"]:
@@ -160,7 +114,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                     "title": f"Distribution of {col}",
                     "column": col
                 })
-
+        
         # Add correlation heatmap if correlations exist
         if "correlations" in analysis_results and analysis_results["correlations"]:
             visualizations.append({
@@ -168,7 +122,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                 "title": "Correlation Heatmap",
                 "data": analysis_results["correlations"]
             })
-
+    
     elif analysis_type == "diagnostic":
         # Add visualizations for diagnostic analysis
         if "feature_importance" in analysis_results:
@@ -177,7 +131,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                 "title": "Feature Importance",
                 "data": analysis_results["feature_importance"]
             })
-
+        
         if "outlier_detection" in analysis_results:
             visualizations.append({
                 "type": "scatter_plot",
@@ -191,7 +145,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                 "title": "Correlation with Target",
                 "data": analysis_results["correlation_analysis"]
             })
-
+    
     elif analysis_type == "predictive":
         # Add visualizations for predictive analysis
         if "model_performance" in analysis_results:
@@ -200,7 +154,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                 "title": "Model Performance Metrics",
                 "data": analysis_results["model_performance"]
             })
-
+        
         if "feature_importance" in analysis_results:
             visualizations.append({
                 "type": "bar_chart",
@@ -211,7 +165,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
         if "predictions" in analysis_results and analysis_results["predictions"]:
             actual_values = [pred["actual"] for pred in analysis_results["predictions"]]
             predicted_values = [pred["predicted"] for pred in analysis_results["predictions"]]
-
+            
             visualizations.append({
                 "type": "scatter_plot",
                 "title": "Predictions vs Actual Values",
@@ -220,7 +174,7 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                     "predicted": predicted_values
                 }
             })
-
+    
     elif analysis_type == "prescriptive":
         # Add visualizations for prescriptive analysis
         if "optimization_results" in analysis_results:
@@ -229,20 +183,20 @@ def generate_visualizations(analysis_type: str, analysis_results: Dict[str, Any]
                 "title": "Optimal Variable Values",
                 "data": analysis_results["optimization_results"].get("optimal_values", {})
             })
-
+        
         if "scenario_comparison" in analysis_results:
             visualizations.append({
                 "type": "radar_chart",
                 "title": "Scenario Comparison",
                 "data": analysis_results["scenario_comparison"]
             })
-
+            
         if "sensitivity_analysis" in analysis_results:
             visualizations.append({
                 "type": "heat_map",
                 "title": "Sensitivity Analysis",
                 "data": analysis_results["sensitivity_analysis"]
             })
-
+    
     return visualizations
 

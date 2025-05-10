@@ -67,12 +67,20 @@ data/processed/*
 Thumbs.db
 
 transform.py
-# ignore
+# ignore _ docker files
+docker-compose.yml
+docker-entrypoint.sh
+Dockerfile
+
+
+src_mode/
 app_workflow_tree.md
 src/frontend/pages/utils
 src/backend/core/preprocessing/utils
 src/frontend/pages/structural_issues
 src/backend/core/preprocessing/column_mapper.py
+data_engineering/
+kubernetes/
 
 #
 technical_documentation.md
@@ -81,3 +89,4 @@ technical_documentation.md
 **/__pycache__
 **/**/__pycache__ 
 **/**/**/__pycache__
+**/**/**/**/__pycache__

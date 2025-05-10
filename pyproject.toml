@@ -46,6 +46,7 @@ dependencies = [
      "pyarrow>=19.0.1",
      "colorama>=0.4.6",
      "pyspark>=3.5.5",
+     "networkx>=3.4.2",
 ]
 
 [project.optional-dependencies]
