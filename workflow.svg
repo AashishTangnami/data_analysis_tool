@@ -1,0 +1,191 @@
+<svg viewBox="0 0 1200 1600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="1600" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="600" y="40" font-family="Arial, sans-serif" font-size="32" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+    Data Analysis Tool Architecture & Workflow
+  </text>
+  
+  <!-- Frontend Section -->
+  <rect x="50" y="80" width="500" height="700" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="10"/>
+  <text x="300" y="110" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#1976d2">
+    Frontend (Streamlit)
+  </text>
+  
+  <!-- Frontend Components -->
+  <rect x="70" y="140" width="460" height="100" fill="#ffffff" stroke="#1976d2" stroke-width="1" rx="5"/>
+  <text x="90" y="165" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1976d2">Pages</text>
+  <text x="90" y="190" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Upload Page</text>
+  <text x="90" y="210" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Preprocessing Page</text>
+  <text x="90" y="230" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Analysis Page</text>
+  
+  <rect x="70" y="260" width="460" height="100" fill="#ffffff" stroke="#1976d2" stroke-width="1" rx="5"/>
+  <text x="90" y="285" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1976d2">Components</text>
+  <text x="90" y="310" font-family="Arial, sans-serif" font-size="14" fill="#424242">• File Uploader</text>
+  <text x="90" y="330" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Data Preview</text>
+  <text x="90" y="350" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Visualization Component</text>
+  <text x="300" y="310" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Engine Selector</text>
+  <text x="300" y="330" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Analysis Renderers</text>
+  
+  <rect x="70" y="380" width="460" height="80" fill="#ffffff" stroke="#1976d2" stroke-width="1" rx="5"/>
+  <text x="90" y="405" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1976d2">Frontend Context</text>
+  <text x="90" y="430" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Manages engine selection</text>
+  <text x="90" y="450" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Handles API communication</text>
+  
+  <rect x="70" y="480" width="460" height="60" fill="#ffffff" stroke="#1976d2" stroke-width="1" rx="5"/>
+  <text x="90" y="505" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1976d2">API Client</text>
+  <text x="90" y="525" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Communicates with backend services</text>
+  
+  <rect x="70" y="560" width="460" height="60" fill="#ffffff" stroke="#1976d2" stroke-width="1" rx="5"/>
+  <text x="90" y="585" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1976d2">Session State</text>
+  <text x="90" y="605" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Stores frontend state using Streamlit</text>
+  
+  <!-- Backend Section -->
+  <rect x="650" y="80" width="500" height="700" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="10"/>
+  <text x="900" y="110" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#7b1fa2">
+    Backend (FastAPI)
+  </text>
+  
+  <!-- Backend Components -->
+  <rect x="670" y="140" width="460" height="100" fill="#ffffff" stroke="#7b1fa2" stroke-width="1" rx="5"/>
+  <text x="690" y="165" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#7b1fa2">API Routes</text>
+  <text x="690" y="190" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Ingestion Route</text>
+  <text x="690" y="210" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Preprocessing Route</text>
+  <text x="690" y="230" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Analysis Route</text>
+  
+  <rect x="670" y="260" width="460" height="80" fill="#ffffff" stroke="#7b1fa2" stroke-width="1" rx="5"/>
+  <text x="690" y="285" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#7b1fa2">Engine Context</text>
+  <text x="690" y="310" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Manages engine selection</text>
+  <text x="690" y="330" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Delegates operations to engines</text>
+  
+  <rect x="670" y="360" width="460" height="120" fill="#ffffff" stroke="#7b1fa2" stroke-width="1" rx="5"/>
+  <text x="690" y="385" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#7b1fa2">Engines (Strategy Pattern)</text>
+  <text x="690" y="410" font-family="Arial, sans-serif" font-size="14" fill="#424242">• EngineBase (Interface)</text>
+  <text x="690" y="430" font-family="Arial, sans-serif" font-size="14" fill="#424242">• PandasEngine</text>
+  <text x="690" y="450" font-family="Arial, sans-serif" font-size="14" fill="#424242">• PolarsEngine</text>
+  <text x="690" y="470" font-family="Arial, sans-serif" font-size="14" fill="#424242">• PySparkEngine</text>
+  
+  <rect x="670" y="500" width="460" height="60" fill="#ffffff" stroke="#7b1fa2" stroke-width="1" rx="5"/>
+  <text x="690" y="525" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#7b1fa2">Session Manager</text>
+  <text x="690" y="545" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Manages data persistence across requests</text>
+  
+  <rect x="670" y="580" width="460" height="60" fill="#ffffff" stroke="#7b1fa2" stroke-width="1" rx="5"/>
+  <text x="690" y="605" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#7b1fa2">File Storage</text>
+  <text x="690" y="625" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Temporary file storage with cleanup</text>
+  
+  <!-- Shared Components -->
+  <rect x="350" y="660" width="500" height="100" fill="#e8f5e9" stroke="#388e3c" stroke-width="2" rx="10"/>
+  <text x="600" y="690" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#388e3c">
+    Shared Components
+  </text>
+  <text x="400" y="720" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Session Manager</text>
+  <text x="400" y="740" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Logging Config</text>
+  <text x="600" y="720" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Constants</text>
+  <text x="600" y="740" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Request/Response Models</text>
+  
+  <!-- Communication Arrows -->
+  <path d="M550,300 L650,300" stroke="#424242" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="600" y="290" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#424242">API Requests</text>
+  
+  <path d="M650,350 L550,350" stroke="#424242" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="600" y="370" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#424242">API Responses</text>
+  
+  <!-- Workflow Section -->
+  <text x="600" y="820" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+    Data Processing Workflow
+  </text>
+  
+  <!-- Workflow Steps -->
+  <rect x="50" y="860" width="1100" height="700" fill="#fff3e0" stroke="#f57c00" stroke-width="2" rx="10"/>
+  
+  <!-- Ingestion Flow -->
+  <rect x="70" y="880" width="250" height="280" fill="#ffffff" stroke="#f57c00" stroke-width="1" rx="5"/>
+  <text x="195" y="905" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#f57c00">
+    1. Ingestion Flow
+  </text>
+  <text x="80" y="930" font-family="Arial, sans-serif" font-size="14" fill="#424242">1. User uploads file</text>
+  <text x="80" y="950" font-family="Arial, sans-serif" font-size="14" fill="#424242">2. Frontend handles upload</text>
+  <text x="80" y="970" font-family="Arial, sans-serif" font-size="14" fill="#424242">3. API client sends to backend</text>
+  <text x="80" y="990" font-family="Arial, sans-serif" font-size="14" fill="#424242">4. Backend processes upload</text>
+  <text x="80" y="1010" font-family="Arial, sans-serif" font-size="14" fill="#424242">5. Engine loads data</text>
+  <text x="80" y="1030" font-family="Arial, sans-serif" font-size="14" fill="#424242">6. Data stored in session</text>
+  <text x="80" y="1050" font-family="Arial, sans-serif" font-size="14" fill="#424242">7. Preview returned</text>
+  
+  <!-- Preprocessing Flow -->
+  <rect x="340" y="880" width="250" height="280" fill="#ffffff" stroke="#f57c00" stroke-width="1" rx="5"/>
+  <text x="465" y="905" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#f57c00">
+    2. Preprocessing Flow
+  </text>
+  <text x="350" y="930" font-family="Arial, sans-serif" font-size="14" fill="#424242">1. User selects operations</text>
+  <text x="350" y="950" font-family="Arial, sans-serif" font-size="14" fill="#424242">2. Frontend sends request</text>
+  <text x="350" y="970" font-family="Arial, sans-serif" font-size="14" fill="#424242">3. Backend processes</text>
+  <text x="350" y="990" font-family="Arial, sans-serif" font-size="14" fill="#424242">4. Engine applies operations</text>
+  <text x="350" y="1010" font-family="Arial, sans-serif" font-size="14" fill="#424242">5. Preprocessed data stored</text>
+  <text x="350" y="1030" font-family="Arial, sans-serif" font-size="14" fill="#424242">6. Preview returned</text>
+  <text x="350" y="1050" font-family="Arial, sans-serif" font-size="14" fill="#424242">7. User chooses data version</text>
+  
+  <!-- Analysis Flow -->
+  <rect x="610" y="880" width="250" height="280" fill="#ffffff" stroke="#f57c00" stroke-width="1" rx="5"/>
+  <text x="735" y="905" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#f57c00">
+    3. Analysis Flow
+  </text>
+  <text x="620" y="930" font-family="Arial, sans-serif" font-size="14" fill="#424242">1. User selects analysis type</text>
+  <text x="620" y="950" font-family="Arial, sans-serif" font-size="14" fill="#424242">2. Frontend sends request</text>
+  <text x="620" y="970" font-family="Arial, sans-serif" font-size="14" fill="#424242">3. Backend processes</text>
+  <text x="620" y="990" font-family="Arial, sans-serif" font-size="14" fill="#424242">4. Engine performs analysis</text>
+  <text x="620" y="1010" font-family="Arial, sans-serif" font-size="14" fill="#424242">5. Results returned</text>
+  <text x="620" y="1030" font-family="Arial, sans-serif" font-size="14" fill="#424242">6. Frontend displays results</text>
+  
+  <!-- Visualization Flow -->
+  <rect x="880" y="880" width="250" height="280" fill="#ffffff" stroke="#f57c00" stroke-width="1" rx="5"/>
+  <text x="1005" y="905" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#f57c00">
+    4. Visualization Flow
+  </text>
+  <text x="890" y="930" font-family="Arial, sans-serif" font-size="14" fill="#424242">1. Frontend receives data</text>
+  <text x="890" y="950" font-family="Arial, sans-serif" font-size="14" fill="#424242">2. Visualization component</text>
+  <text x="890" y="970" font-family="Arial, sans-serif" font-size="14" fill="#424242">   renders visuals</text>
+  <text x="890" y="990" font-family="Arial, sans-serif" font-size="14" fill="#424242">3. Frontend displays to user</text>
+  
+  <!-- Flow Arrows -->
+  <path d="M320,1020 L340,1020" stroke="#f57c00" stroke-width="3" fill="none" marker-end="url(#arrowhead-orange)"/>
+  <path d="M590,1020 L610,1020" stroke="#f57c00" stroke-width="3" fill="none" marker-end="url(#arrowhead-orange)"/>
+  <path d="M860,1020 L880,1020" stroke="#f57c00" stroke-width="3" fill="none" marker-end="url(#arrowhead-orange)"/>
+  
+  <!-- Strategy Pattern Explanation -->
+  <rect x="50" y="1200" width="1100" height="350" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="10"/>
+  <text x="600" y="1230" font-family="Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#7b1fa2">
+    Strategy Pattern Implementation
+  </text>
+  
+  <rect x="70" y="1260" width="520" height="270" fill="#ffffff" stroke="#7b1fa2" stroke-width="1" rx="5"/>
+  <text x="330" y="1290" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#7b1fa2">
+    Frontend Strategy
+  </text>
+  <text x="80" y="1320" font-family="Arial, sans-serif" font-size="14" fill="#424242">• FrontendContext acts as the context</text>
+  <text x="80" y="1340" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Engine type stored in session state</text>
+  <text x="80" y="1360" font-family="Arial, sans-serif" font-size="14" fill="#424242">• API calls include engine type parameter</text>
+  
+  <rect x="610" y="1260" width="520" height="270" fill="#ffffff" stroke="#7b1fa2" stroke-width="1" rx="5"/>
+  <text x="870" y="1290" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#7b1fa2">
+    Backend Strategy
+  </text>
+  <text x="620" y="1320" font-family="Arial, sans-serif" font-size="14" fill="#424242">• EngineContext acts as the context</text>
+  <text x="620" y="1340" font-family="Arial, sans-serif" font-size="14" fill="#424242">• EngineBase is the strategy interface</text>
+  <text x="620" y="1360" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Concrete strategies: PandasEngine, PolarsEngine, PySparkEngine</text>
+  <text x="620" y="1380" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Factory method in EngineBase.create() creates appropriate engine</text>
+  
+  <text x="80" y="1420" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#7b1fa2">Benefits:</text>
+  <text x="80" y="1445" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Flexible engine selection</text>
+  <text x="80" y="1505" font-family="Arial, sans-serif" font-size="14" fill="#424242">• Consistent interface across engines</text>
+  
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#424242"/>
+    </marker>
+    <marker id="arrowhead-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f57c00"/>
+    </marker>
+  </defs>
+</svg>
