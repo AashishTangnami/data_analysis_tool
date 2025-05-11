@@ -1,8 +1,15 @@
-from typing import Dict, Any, List
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from typing import Dict, Any, List, Tuple, Optional
+import time
+import traceback
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
+from pydantic import BaseModel, Field
 from core.context import EngineContext
 from api.models.responses import PreprocessingResponse
+from api.routes.ingestion import data_storage
+from src.shared.logging_utils import setup_logger
+
+# Set up logger - disable console output to only log to file
+logger = setup_logger("preprocessing", console_output=False)
 
 router = APIRouter()
 
@@ -11,52 +18,198 @@ preprocessed_data_storage = {}
 
 class PreprocessingRequest(BaseModel):
     """Request model for preprocessing operations"""
-    file_id: str
+    file_id: str = Field(..., description="ID of the file to preprocess")
+    operations: List[Dict[str, Any]] = Field(..., description="List of preprocessing operations to apply")
+
+def validate_file_exists(file_id: str) -> None:
+    """
+    Validate that the file exists in data storage.
+
+    Args:
+        file_id: ID of the file to validate
+
+    Raises:
+        HTTPException: If file is not found
+    """
+    logger.debug(f"Validating file existence: {file_id}")
+    if not file_id:
+        logger.error("Empty file_id provided")
+        raise HTTPException(status_code=400, detail="File ID cannot be empty")
+
+    if file_id not in data_storage:
+        logger.error(f"File not found: {file_id}")
+        raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+
+def extract_engine_type(file_id: str) -> str:
+    """
+    Extract engine type from file_id.
+
+    Args:
+        file_id: ID of the file
+
+    Returns:
+        Engine type string
+
+    Raises:
+        HTTPException: If engine type cannot be extracted
+    """
+    try:
+        logger.debug(f"Extracting engine type from file_id: {file_id}")
+        parts = file_id.split("_")
+        if not parts or len(parts) < 1:
+            logger.error(f"Invalid file_id format: {file_id}")
+            raise ValueError(f"Invalid file_id format: {file_id}")
+
+        engine_type = parts[0]
+        logger.debug(f"Extracted engine type: {engine_type}")
+        return engine_type
+    except Exception as e:
+        logger.error(f"Failed to extract engine type: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid file ID format: {str(e)}")
+
+def initialize_engine_context(engine_type: str) -> EngineContext:
+    """
+    Initialize the engine context.
+
+    Args:
+        engine_type: Type of engine to initialize
+
+    Returns:
+        Initialized EngineContext
+
+    Raises:
+        HTTPException: If engine type is not supported or initialization fails
+    """
+    start_time = time.time()
+    logger.debug(f"Initializing engine context for type: {engine_type}")
+
+    try:
+        context = EngineContext(engine_type)
+        logger.debug(f"Engine context initialized successfully in {time.time() - start_time:.2f}s")
+        return context
+    except ValueError as e:
+        logger.error(f"Invalid engine type: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid engine type: {str(e)}")
+    except Exception as e:
+        logger.error(f"Failed to initialize engine context: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Engine initialization error: {str(e)}")
+
+def process_data(
+    engine_context: EngineContext,
+    file_id: str,
     operations: List[Dict[str, Any]]
+) -> Tuple[Any, Dict[str, Any], Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Process data with the given operations.
+
+    Args:
+        engine_context: Initialized engine context
+        file_id: ID of the file to process
+        operations: List of preprocessing operations to apply
+
+    Returns:
+        Tuple containing:
+        - Processed data
+        - Original data summary
+        - Processed data summary
+        - Preview of processed data
+
+    Raises:
+        HTTPException: If processing fails
+    """
+    start_time = time.time()
+    logger.info(f"Starting data processing for file: {file_id}")
+    logger.debug(f"Operations to apply: {operations}")
+
+    try:
+        # Get original data
+        logger.debug(f"Retrieving original data for file: {file_id}")
+        original_data = data_storage[file_id]
+
+        # Generate summary for original data
+        logger.debug("Generating summary for original data")
+        original_summary = engine_context.get_data_summary(original_data)
+        logger.debug(f"Original data shape: {original_summary.get('shape', 'unknown')}")
+
+        # Validate operations
+        if not operations:
+            logger.warning("No preprocessing operations provided")
+            raise ValueError("No preprocessing operations provided")
+
+        # Apply preprocessing operations
+        logger.info(f"Applying {len(operations)} preprocessing operations")
+        operation_start_time = time.time()
+        processed_data = engine_context.preprocess_data(original_data, operations)
+        logger.info(f"Preprocessing completed in {time.time() - operation_start_time:.2f}s")
+
+        # Generate summary for processed data
+        logger.debug("Generating summary for processed data")
+        processed_summary = engine_context.get_data_summary(processed_data)
+        logger.debug(f"Processed data shape: {processed_summary.get('shape', 'unknown')}")
+
+        # Convert to pandas and get preview
+        logger.debug("Converting to pandas for preview")
+        pandas_data = engine_context.to_pandas(processed_data)
+        preview = pandas_data.head(10).to_dict(orient="records")
+
+        logger.info(f"Data processing completed successfully in {time.time() - start_time:.2f}s")
+        return processed_data, original_summary, processed_summary, preview
+
+    except ValueError as e:
+        logger.error(f"Invalid operation: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid operation: {str(e)}")
+    except TypeError as e:
+        logger.error(f"Type error in preprocessing: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Type error in preprocessing: {str(e)}")
+    except KeyError as e:
+        logger.error(f"Missing key in operation: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Missing key in operation: {str(e)}")
+    except MemoryError as e:
+        logger.critical(f"Memory error during processing: {str(e)}")
+        raise HTTPException(status_code=507, detail="Insufficient memory to process data")
+    except Exception as e:
+        logger.error(f"Processing error: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
 
 @router.post("/process", response_model=PreprocessingResponse)
-async def preprocess_data(request: PreprocessingRequest):
+async def preprocess_data(request: PreprocessingRequest, req: Request):
     """
     Apply preprocessing operations to data.
-    
+
     Args:
         request: PreprocessingRequest with file_id and operations
-        
+        req: FastAPI Request object for request information
+
     Returns:
         PreprocessingResponse with processed data information
     """
-    from api.routes.ingestion import data_storage
-    
-    # Check if file exists
-    if request.file_id not in data_storage:
-        raise HTTPException(status_code=404, detail="File not found")
-    
+    request_id = f"{time.time():.0f}"
+    client_ip = req.client.host if req.client else "unknown"
+    logger.info(f"Request {request_id} from {client_ip}: Processing data for file {request.file_id}")
+
+    start_time = time.time()
+
     try:
-        
-        # Get engine type from file_id
-        engine_type = request.file_id.split("_")[0]
-        
-        # Initialize engine context
-        engine_context = EngineContext(engine_type)
-        
-        # Get original data
-        original_data = data_storage[request.file_id]
-        original_summary = engine_context.get_data_summary(original_data)
-        
-        # Apply preprocessing operations
-        processed_data = engine_context.preprocess_data(original_data, request.operations)
-        
-        # Generate summary for processed data
-        processed_summary = engine_context.get_data_summary(processed_data)
-        
+        # Validate file exists
+        validate_file_exists(request.file_id)
+
+        # Extract engine type and initialize context
+        engine_type = extract_engine_type(request.file_id)
+        engine_context = initialize_engine_context(engine_type)
+
+        # Process the data
+        processed_data, original_summary, processed_summary, preview = process_data(
+            engine_context, request.file_id, request.operations
+        )
+
         # Store processed data for later use
+        logger.debug(f"Storing processed data for file: {request.file_id}")
         preprocessed_data_storage[request.file_id] = processed_data
-        
-        # Convert to pandas and get preview
-        pandas_data = engine_context.to_pandas(processed_data)
-        preview = pandas_data.head(10).to_dict(orient="records")
-        
-        return PreprocessingResponse(
+
+        # Create response
+        response = PreprocessingResponse(
             file_id=request.file_id,
             original_summary=original_summary,
             processed_summary=processed_summary,
@@ -64,29 +217,41 @@ async def preprocess_data(request: PreprocessingRequest):
             operations_applied=request.operations,
             message="Data preprocessed successfully"
         )
-    
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/operations/{engine_type}", response_model=Dict[str, Any])
-async def get_available_operations(engine_type: str):
+        # Log success
+        processing_time = time.time() - start_time
+        logger.info(f"Request {request_id} completed successfully in {processing_time:.2f}s")
+
+        return response
+
+    except HTTPException as e:
+        # Log HTTP exceptions and re-raise
+        logger.error(f"Request {request_id} failed with HTTP error: {e.status_code} - {e.detail}")
+        raise
+
+    except Exception as e:
+        # Log and convert unexpected errors
+        logger.error(f"Request {request_id} failed with unexpected error: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+def get_preprocessing_operations(engine_type: str) -> Dict[str, Dict[str, Any]]:
     """
     Get available preprocessing operations for the specified engine.
-    
+
     Args:
         engine_type: Type of engine (pandas, polars, pyspark)
-        
+
     Returns:
         Dictionary of available operations
+
+    Raises:
+        HTTPException: If engine type is not supported or operations cannot be retrieved
     """
+    logger.debug(f"Getting preprocessing operations for engine: {engine_type}")
+
     try:
-        # Initialize engine context
-        engine_context = EngineContext(engine_type)
-        
-        # Get available operations from the preprocessing component
-        # We need to access the engine's preprocessing component directly
-        operations = {}
-        
+        # Import preprocessing classes based on engine type
         if engine_type == "pandas":
             from core.preprocessing.pandas_preprocessing import PandasPreprocessing
             operations = PandasPreprocessing().get_available_operations()
@@ -96,11 +261,56 @@ async def get_available_operations(engine_type: str):
         elif engine_type == "pyspark":
             from core.preprocessing.pyspark_preprocessing import PySparkPreprocessing
             operations = PySparkPreprocessing().get_available_operations()
-        
-        return {"operations": operations}
-    
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    
+        else:
+            logger.error(f"Unsupported engine type: {engine_type}")
+            raise ValueError(f"Unsupported engine type: {engine_type}")
 
-  
+        logger.debug(f"Retrieved {len(operations)} operations for engine: {engine_type}")
+        return operations
+
+    except ImportError as e:
+        logger.error(f"Failed to import preprocessing module: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to import preprocessing module: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error retrieving operations: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=400, detail=f"Error retrieving operations: {str(e)}")
+
+@router.get("/operations/{engine_type}", response_model=Dict[str, Any])
+async def get_available_operations(engine_type: str, req: Request):
+    """
+    Get available preprocessing operations for the specified engine.
+
+    Args:
+        engine_type: Type of engine (pandas, polars, pyspark)
+        req: FastAPI Request object for request information
+
+    Returns:
+        Dictionary of available operations
+    """
+    request_id = f"{time.time():.0f}"
+    client_ip = req.client.host if req.client else "unknown"
+    logger.info(f"Request {request_id} from {client_ip}: Getting operations for engine {engine_type}")
+
+    start_time = time.time()
+
+    try:
+        operations = get_preprocessing_operations(engine_type)
+
+        # Log success
+        processing_time = time.time() - start_time
+        logger.info(f"Request {request_id} completed successfully in {processing_time:.2f}s")
+
+        return {"operations": operations}
+
+    except HTTPException as e:
+        # Log HTTP exceptions and re-raise
+        logger.error(f"Request {request_id} failed with HTTP error: {e.status_code} - {e.detail}")
+        raise
+
+    except Exception as e:
+        # Log and convert unexpected errors
+        logger.error(f"Request {request_id} failed with unexpected error: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
