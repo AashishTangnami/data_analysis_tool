@@ -7,6 +7,10 @@ from core.context import EngineContext
 from api.models.responses import PreprocessingResponse
 from api.routes.ingestion import data_storage
 from src.shared.logging_utils import setup_logger
+from api.utils.data_utils import extract_engine_type as shared_extract_engine_type
+from api.utils.data_utils import initialize_engine_context as shared_initialize_engine_context
+from api.utils.data_utils import generate_data_preview
+from api.utils.data_utils import validate_file_exists as shared_validate_file_exists
 
 # Set up logger - disable console output to only log to file
 logger = setup_logger("preprocessing", console_output=False)
@@ -21,7 +25,7 @@ class PreprocessingRequest(BaseModel):
     file_id: str = Field(..., description="ID of the file to preprocess")
     operations: List[Dict[str, Any]] = Field(..., description="List of preprocessing operations to apply")
 
-def validate_file_exists(file_id: str) -> None:
+async def validate_file_exists(file_id: str) -> None:
     """
     Validate that the file exists in data storage.
 
@@ -31,14 +35,8 @@ def validate_file_exists(file_id: str) -> None:
     Raises:
         HTTPException: If file is not found
     """
-    logger.debug(f"Validating file existence: {file_id}")
-    if not file_id:
-        logger.error("Empty file_id provided")
-        raise HTTPException(status_code=400, detail="File ID cannot be empty")
-
-    if file_id not in data_storage:
-        logger.error(f"File not found: {file_id}")
-        raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
+    # Use the shared utility function
+    await shared_validate_file_exists(file_id)
 
 def extract_engine_type(file_id: str) -> str:
     """
@@ -53,19 +51,8 @@ def extract_engine_type(file_id: str) -> str:
     Raises:
         HTTPException: If engine type cannot be extracted
     """
-    try:
-        logger.debug(f"Extracting engine type from file_id: {file_id}")
-        parts = file_id.split("_")
-        if not parts or len(parts) < 1:
-            logger.error(f"Invalid file_id format: {file_id}")
-            raise ValueError(f"Invalid file_id format: {file_id}")
-
-        engine_type = parts[0]
-        logger.debug(f"Extracted engine type: {engine_type}")
-        return engine_type
-    except Exception as e:
-        logger.error(f"Failed to extract engine type: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Invalid file ID format: {str(e)}")
+    # Use the shared utility function
+    return shared_extract_engine_type(file_id)
 
 def initialize_engine_context(engine_type: str) -> EngineContext:
     """
@@ -80,20 +67,8 @@ def initialize_engine_context(engine_type: str) -> EngineContext:
     Raises:
         HTTPException: If engine type is not supported or initialization fails
     """
-    start_time = time.time()
-    logger.debug(f"Initializing engine context for type: {engine_type}")
-
-    try:
-        context = EngineContext(engine_type)
-        logger.debug(f"Engine context initialized successfully in {time.time() - start_time:.2f}s")
-        return context
-    except ValueError as e:
-        logger.error(f"Invalid engine type: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Invalid engine type: {str(e)}")
-    except Exception as e:
-        logger.error(f"Failed to initialize engine context: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Engine initialization error: {str(e)}")
+    # Use the shared utility function
+    return shared_initialize_engine_context(engine_type)
 
 def process_data(
     engine_context: EngineContext,
@@ -148,10 +123,9 @@ def process_data(
         processed_summary = engine_context.get_data_summary(processed_data)
         logger.debug(f"Processed data shape: {processed_summary.get('shape', 'unknown')}")
 
-        # Convert to pandas and get preview
-        logger.debug("Converting to pandas for preview")
-        pandas_data = engine_context.to_pandas(processed_data)
-        preview = pandas_data.head(10).to_dict(orient="records")
+        # Generate preview using shared utility
+        logger.debug("Generating data preview")
+        preview = generate_data_preview(engine_context, processed_data)
 
         logger.info(f"Data processing completed successfully in {time.time() - start_time:.2f}s")
         return processed_data, original_summary, processed_summary, preview
@@ -192,8 +166,8 @@ async def preprocess_data(request: PreprocessingRequest, req: Request):
     start_time = time.time()
 
     try:
-        # Validate file exists
-        validate_file_exists(request.file_id)
+        # Validate file exists using async function
+        await validate_file_exists(request.file_id)
 
         # Extract engine type and initialize context
         engine_type = extract_engine_type(request.file_id)
