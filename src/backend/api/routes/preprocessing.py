@@ -5,12 +5,11 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 from core.context import EngineContext
 from api.models.responses import PreprocessingResponse
-from api.routes.ingestion import data_storage
+from api.services import data_service
 from src.shared.logging_utils import setup_logger
 from api.utils.data_utils import extract_engine_type as shared_extract_engine_type
 from api.utils.data_utils import initialize_engine_context as shared_initialize_engine_context
 from api.utils.data_utils import generate_data_preview
-from api.utils.data_utils import validate_file_exists as shared_validate_file_exists
 
 # Set up logger - disable console output to only log to file
 logger = setup_logger("preprocessing", console_output=False)
@@ -35,8 +34,11 @@ async def validate_file_exists(file_id: str) -> None:
     Raises:
         HTTPException: If file is not found
     """
-    # Use the shared utility function
-    await shared_validate_file_exists(file_id)
+    # Use the data service
+    exists = await data_service.check_file_exists(file_id)
+    if not exists:
+        logger.error(f"File not found in storage: {file_id}")
+        raise HTTPException(status_code=404, detail=f"File not found: {file_id}")
 
 def extract_engine_type(file_id: str) -> str:
     """
@@ -70,7 +72,7 @@ def initialize_engine_context(engine_type: str) -> EngineContext:
     # Use the shared utility function
     return shared_initialize_engine_context(engine_type)
 
-def process_data(
+async def process_data(
     engine_context: EngineContext,
     file_id: str,
     operations: List[Dict[str, Any]]
@@ -98,9 +100,9 @@ def process_data(
     logger.debug(f"Operations to apply: {operations}")
 
     try:
-        # Get original data
+        # Get original data using data service
         logger.debug(f"Retrieving original data for file: {file_id}")
-        original_data = data_storage[file_id]
+        original_data = await data_service.get_file_data(file_id)
 
         # Generate summary for original data
         logger.debug("Generating summary for original data")
@@ -174,7 +176,7 @@ async def preprocess_data(request: PreprocessingRequest, req: Request):
         engine_context = initialize_engine_context(engine_type)
 
         # Process the data
-        processed_data, original_summary, processed_summary, preview = process_data(
+        processed_data, original_summary, processed_summary, preview = await process_data(
             engine_context, request.file_id, request.operations
         )
 
